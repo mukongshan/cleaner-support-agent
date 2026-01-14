@@ -145,11 +145,11 @@ data: {"event": "message_end", "metadata": {"retriever_resources": [...]}}
 
 ---
 
-## 4. 知识库接口 (Knowledge Base)
+## 4. 媒体文件/知识文档接口 (Media / Knowledge Files)
 
-### 4.1 搜索/获取知识库列表
-- **描述:** 根据分类或关键词获取文档。
-- **请求路径:** `GET /knowledge/articles`
+### 4.1 搜索/获取媒体文件列表
+- **描述:** 根据分类或关键词获取文档/视频等媒体文件，用于前端展示“知识库列表”或“文件列表”。
+- **请求路径:** `GET /media/files`
 - **查询参数:** `category=maintenance`, `query=传感器`
 - **响应示例:**
 ```json
@@ -168,9 +168,9 @@ data: {"event": "message_end", "metadata": {"retriever_resources": [...]}}
 }
 ```
 
-### 4.2 获取知识库详情
-- **描述:** 获取具体 Markdown 内容或视频地址。
-- **请求路径:** `GET /knowledge/articles/{id}`
+### 4.2 获取媒体文件详情/下载信息
+- **描述:** 获取具体 Markdown 内容、视频地址或文件下载信息。
+- **请求路径:** `GET /media/files/{id}`
 - **响应示例:**
 ```json
 {
