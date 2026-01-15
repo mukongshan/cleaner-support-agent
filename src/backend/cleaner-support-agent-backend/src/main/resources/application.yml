@@ -9,8 +9,8 @@ spring:
   # 数据库（默认 MySQL；也可通过环境变量覆盖为 Postgres）
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/cleaner_support?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai}
-    username: ${SPRING_DATASOURCE_USERNAME:root}
-    password: ${SPRING_DATASOURCE_PASSWORD:root}
+    username: ${SPRING_DATASOURCE_USERNAME:kongshan}
+    password: ${SPRING_DATASOURCE_PASSWORD:zmt20041204}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:com.mysql.cj.jdbc.Driver}
 
   jpa:

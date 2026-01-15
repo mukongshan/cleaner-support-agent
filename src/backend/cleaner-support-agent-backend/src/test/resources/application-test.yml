@@ -1,0 +1,30 @@
+# 测试环境专用配置
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop  # 测试时每次重新创建表
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: true
+
+  h2:
+    console:
+      enabled: false  # 测试时不需要H2控制台
+
+# 测试环境禁用AI服务调用
+app:
+  ai:
+    base-url:
+    api-key:
+  cors:
+    allowed-origins: http://localhost:5173
+  media:
+    upload-dir: ./test-uploads

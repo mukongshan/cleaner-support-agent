@@ -1,34 +1,52 @@
 package org.backend.cleanersupportagentbackend.controller.app;
 
+import org.backend.cleanersupportagentbackend.annotation.CurrentUserId;
 import org.backend.cleanersupportagentbackend.controller.ApiResponse;
-import org.springframework.http.HttpStatus;
+import org.backend.cleanersupportagentbackend.dto.ChatRequest;
+import org.backend.cleanersupportagentbackend.dto.ConversationDetailResponse;
+import org.backend.cleanersupportagentbackend.dto.ConversationSummaryResponse;
+import org.backend.cleanersupportagentbackend.service.AiService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.util.Map;
+import java.util.List;
 
 @RestController
-@RequestMapping("/api/cleaner-support/v1/ai")
+@RequestMapping("/api/cleaner-support/v2/ai")
 public class AiController {
 
+    private final AiService aiService;
+
+    public AiController(AiService aiService) {
+        this.aiService = aiService;
+    }
+
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter chat(@RequestBody Map<String, Object> body) {
-        // 预留 SSE 占位：后续实现“Java 后端透传 Dify 的 SSE”
-        SseEmitter emitter = new SseEmitter();
-        emitter.completeWithError(new UnsupportedOperationException("AI 对话未实现"));
-        return emitter;
+    public SseEmitter chat(@CurrentUserId String userId, @RequestBody ChatRequest request) {
+        return aiService.chat(userId, request);
     }
 
     @GetMapping("/conversations")
-    public ResponseEntity<ApiResponse<?>> listConversations(@RequestParam Map<String, String> query) {
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
-                .body(ApiResponse.notImplemented("获取历史会话列表"));
+    public ResponseEntity<ApiResponse<List<ConversationSummaryResponse>>> listConversations(@CurrentUserId String userId) {
+        try {
+            List<ConversationSummaryResponse> conversations = aiService.getConversations(userId);
+            return ResponseEntity.ok(ApiResponse.success(conversations));
+        } catch (Exception e) {
+            return ResponseEntity.ok(ApiResponse.error(500, e.getMessage()));
+        }
+    }
+
+    @GetMapping("/conversations/{conversationId}")
+    public ResponseEntity<ApiResponse<ConversationDetailResponse>> getConversationDetail(
+            @CurrentUserId String userId,
+            @PathVariable String conversationId) {
+        try {
+            ConversationDetailResponse detail = aiService.getConversationDetail(userId, conversationId);
+            return ResponseEntity.ok(ApiResponse.success(detail));
+        } catch (Exception e) {
+            return ResponseEntity.ok(ApiResponse.error(500, e.getMessage()));
+        }
     }
 }
