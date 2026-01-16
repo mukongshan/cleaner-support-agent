@@ -21,6 +21,15 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserRole } from '../App';
+import {
+  sendAIMessage,
+  getConversations,
+  getConversationDetail,
+  createTicket,
+  Conversation,
+  ConversationDetail
+} from '../services/api';
+import { TicketForm } from './TicketForm';
 
 interface Message {
   id: string;
@@ -69,16 +78,10 @@ interface AIExtractedInfo {
 
 export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageProps) {
   // 聊天会话管理
-  const [chatSessions, setChatSessions] = useState<ChatSession[]>([
-    {
-      id: '1',
-      title: '如何清理主刷？',
-      messages: [],
-      createdAt: new Date(Date.now() - 86400000),
-      updatedAt: new Date(Date.now() - 86400000)
-    }
-  ]);
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [hasCreatedNewChat, setHasCreatedNewChat] = useState(false); // 是否创建过新对话
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -98,10 +101,9 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
   const [showTicketPrompt, setShowTicketPrompt] = useState(false);
   const [ticketCreated, setTicketCreated] = useState(false);
   const [showNewMenu, setShowNewMenu] = useState(false);
+  const [showTicketForm, setShowTicketForm] = useState(false);
 
   // 工单相关
-  const [aiExtractedInfo, setAiExtractedInfo] = useState<AIExtractedInfo | null>(null);
-  const [useAISuggestion, setUseAISuggestion] = useState(true);
   const [ticketFormData, setTicketFormData] = useState<TicketFormData>({
     problemType: 'maintenance',
     priority: 'medium',
@@ -111,6 +113,9 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
     additionalNotes: '',
     images: []
   });
+  const [ticketSubmitting, setTicketSubmitting] = useState(false);
+  const [ticketError, setTicketError] = useState<string | null>(null);
+  const [aiAssisting, setAiAssisting] = useState(false);
 
   // 继续问我相关问题状态
   const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
@@ -199,6 +204,100 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
     scrollToBottom();
   }, [messages, aiThinking]);
 
+  // 加载历史会话列表（使用假数据）
+  const loadHistoryConversations = async () => {
+    try {
+      setLoadingHistory(true);
+
+      // 使用假数据
+      const mockSessions: ChatSession[] = [
+        {
+          id: 'mock-1',
+          title: '如何清理主刷？',
+          messages: [],
+          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2天前
+          updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
+        },
+        {
+          id: 'mock-2',
+          title: '机器人不回充怎么办？',
+          messages: [],
+          createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5天前
+          updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
+        },
+        {
+          id: 'mock-3',
+          title: '更换边刷教程',
+          messages: [],
+          createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7天前
+          updatedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+        },
+        {
+          id: 'mock-4',
+          title: '传感器清洁方法',
+          messages: [],
+          createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), // 10天前
+          updatedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
+        }
+      ];
+
+      setChatSessions(mockSessions);
+    } catch (error) {
+      console.error('加载历史会话失败:', error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  // 加载特定会话的详情（使用假数据）
+  const loadConversationDetail = async (conversationId: string) => {
+    try {
+      // 使用假数据
+      const mockMessages: Message[] = [
+        {
+          id: `${conversationId}-0`,
+          type: 'user',
+          content: '如何清理主刷？',
+          timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+          rating: null
+        },
+        {
+          id: `${conversationId}-1`,
+          type: 'ai',
+          content: '清理主刷的步骤如下：\n\n1. 首先关闭机器人电源\n2. 将主刷从机器人底部取出\n3. 使用软刷或湿布清理主刷上的毛发和灰尘\n4. 检查主刷是否有损坏，如有损坏需要更换\n5. 清理完成后将主刷重新安装回机器人\n\n建议每周清理一次主刷，以保持机器人的清洁效果。',
+          timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 30000),
+          rating: null
+        },
+        {
+          id: `${conversationId}-2`,
+          type: 'user',
+          content: '主刷多久需要更换一次？',
+          timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 60000),
+          rating: null
+        },
+        {
+          id: `${conversationId}-3`,
+          type: 'ai',
+          content: '主刷的更换周期取决于使用频率和清洁情况。一般来说：\n\n- 正常使用情况下，主刷建议每3-6个月更换一次\n- 如果主刷出现明显磨损、变形或无法正常旋转，应立即更换\n- 定期清理可以延长主刷的使用寿命\n\n您可以在我们的官方商城或授权经销商处购买原装主刷。',
+          timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 90000),
+          rating: null
+        }
+      ];
+
+      setMessages(mockMessages);
+      setCurrentSessionId(conversationId);
+    } catch (error) {
+      console.error('加载会话详情失败:', error);
+    }
+  };
+
+  // 当打开历史对话时加载列表（只有在创建过新对话后才加载）
+  useEffect(() => {
+    if (showHistoryDialog && hasCreatedNewChat) {
+      loadHistoryConversations();
+    }
+  }, [showHistoryDialog, hasCreatedNewChat]);
+
   // 处理初始消息
   useEffect(() => {
     if (initialMessage && initialMessage.trim()) {
@@ -238,6 +337,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
     setAiThinking(true);
     setThinkingStep(0);
 
+    // 思考步骤动画
     const stepInterval = setInterval(() => {
       setThinkingStep(prev => {
         if (prev >= thinkingSteps.length - 1) {
@@ -248,23 +348,109 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
       });
     }, 1500);
 
-    setTimeout(() => {
-      clearInterval(stepInterval);
-      setAiThinking(false);
+    let aiMessageId = (Date.now() + 1).toString();
+    let fullAnswer = '';
+    let currentConversationId = currentSessionId || undefined;
 
-      const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'ai',
-        content: getAIResponse(text),
-        timestamp: new Date(),
-        citation: {
-          title: '用户手册 - 维护保养',
-          page: 'P.23-25'
-        },
-        rating: null
-      };
-      setMessages(prev => [...prev, aiResponse]);
-    }, 4500);
+    // 调用真实的 AI API
+    const cancelFn = sendAIMessage(
+      {
+        query: text,
+        conversationId: currentConversationId,
+      },
+      // onMessage: 收到消息片段
+      (event) => {
+        if (event.event === 'message' && event.answer) {
+          fullAnswer += event.answer;
+
+          // 更新或添加 AI 消息
+          setMessages(prev => {
+            const lastMsg = prev[prev.length - 1];
+            if (lastMsg && lastMsg.id === aiMessageId) {
+              // 更新现有消息
+              return prev.map(msg =>
+                msg.id === aiMessageId
+                  ? { ...msg, content: fullAnswer }
+                  : msg
+              );
+            } else {
+              // 添加新消息
+              return [...prev, {
+                id: aiMessageId,
+                type: 'ai' as const,
+                content: fullAnswer,
+                timestamp: new Date(),
+                rating: null
+              }];
+            }
+          });
+        }
+
+        if (event.event === 'message_end') {
+          clearInterval(stepInterval);
+          setAiThinking(false);
+
+          // 保存会话 ID
+          if (event.conversation_id) {
+            setCurrentSessionId(event.conversation_id);
+
+            // 更新会话列表标题
+            if (!currentConversationId) {
+              // 新会话，标记已创建过新对话
+              setHasCreatedNewChat(true);
+              // 新会话，添加到列表（使用假数据）
+              const newSession: ChatSession = {
+                id: event.conversation_id,
+                title: text.slice(0, 20) + (text.length > 20 ? '...' : ''),
+                messages: [],
+                createdAt: new Date(),
+                updatedAt: new Date()
+              };
+              setChatSessions(prev => [newSession, ...prev]);
+            }
+          }
+
+          // 如果有检索资源，可以添加引用
+          if (event.metadata?.retriever_resources && event.metadata.retriever_resources.length > 0) {
+            const resource = event.metadata.retriever_resources[0];
+            setMessages(prev => prev.map(msg =>
+              msg.id === aiMessageId
+                ? {
+                  ...msg,
+                  citation: {
+                    title: resource.title || '知识库文档',
+                    page: resource.page || '参考资料'
+                  }
+                }
+                : msg
+            ));
+          }
+        }
+      },
+      // onError: 错误处理
+      (error) => {
+        console.error('AI 对话错误:', error);
+        clearInterval(stepInterval);
+        setAiThinking(false);
+
+        // 显示错误消息
+        setMessages(prev => [...prev, {
+          id: aiMessageId,
+          type: 'ai' as const,
+          content: '抱歉，我遇到了一些问题。请稍后再试。',
+          timestamp: new Date(),
+          rating: null
+        }]);
+      },
+      // onComplete: 完成
+      () => {
+        clearInterval(stepInterval);
+        setAiThinking(false);
+      }
+    );
+
+    // 保存取消函数，以便需要时可以取消请求
+    // 这里可以存储到 state 或 ref 中
   };
 
   const getAIResponse = (userText: string): string => {
@@ -349,8 +535,10 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
         timestamp: new Date()
       }
     ]);
+    setCurrentSessionId(null); // 重置会话ID
     setTicketCreated(false);
     setShowNewChatDialog(false);
+    setHasCreatedNewChat(true); // 标记已创建过新对话
   };
 
   // 智能提取聊天信息
@@ -399,21 +587,75 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
   };
 
   const handleOpenTicketDialog = () => {
-    const extractedInfo = extractInfoFromChat();
-    setAiExtractedInfo(extractedInfo);
-    setUseAISuggestion(true);
-
+    // 重置表单数据
     setTicketFormData({
-      problemType: extractedInfo.suggestedType,
-      priority: extractedInfo.suggestedPriority,
-      problemSummary: extractedInfo.problemSummary,
+      problemType: 'maintenance',
+      priority: 'medium',
+      problemSummary: '',
       deviceModel: 'CR-X3000',
       deviceSN: 'SN202401120001',
       additionalNotes: '',
-      images: extractedInfo.images
+      images: []
     });
+    setTicketError(null);
+    setShowTicketForm(true);
+  };
 
-    setShowTicketPrompt(true);
+  // AI 辅助填写工单
+  const handleAIAssist = () => {
+    setAiAssisting(true);
+
+    // 模拟 AI 分析对话记录
+    setTimeout(() => {
+      const extractedInfo = extractInfoFromChat();
+
+      setTicketFormData({
+        problemType: extractedInfo.suggestedType,
+        priority: extractedInfo.suggestedPriority,
+        problemSummary: extractedInfo.problemSummary,
+        deviceModel: 'CR-X3000',
+        deviceSN: 'SN202401120001',
+        additionalNotes: extractedInfo.keyDialogues.join('\n'),
+        images: extractedInfo.images
+      });
+
+      setAiAssisting(false);
+    }, 1500);
+  };
+
+  // 提交工单
+  const handleSubmitTicket = async () => {
+    try {
+      setTicketSubmitting(true);
+      setTicketError(null);
+
+      const result = await createTicket({
+        title: ticketFormData.problemSummary || '工单',
+        description: `问题类型: ${getProblemTypeLabel(ticketFormData.problemType)}\n设备型号: ${ticketFormData.deviceModel}\n设备SN: ${ticketFormData.deviceSN}\n\n${ticketFormData.additionalNotes}`,
+        priority: ticketFormData.priority,
+        relatedChatId: currentSessionId || undefined,
+        attachmentUrls: ticketFormData.images.length > 0 ? ticketFormData.images : undefined
+      });
+
+      console.log('工单创建成功:', result);
+
+      setShowTicketForm(false);
+      setTicketCreated(true);
+
+      // 3秒后隐藏成功提示
+      setTimeout(() => {
+        setTicketCreated(false);
+      }, 3000);
+
+      if (onCreateTicket) {
+        onCreateTicket();
+      }
+    } catch (err: any) {
+      console.error('创建工单失败:', err);
+      setTicketError(err.message || '创建工单失败');
+    } finally {
+      setTicketSubmitting(false);
+    }
   };
 
   const getProblemTypeLabel = (type: string) => {
@@ -464,14 +706,15 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.2 }}
-                  className="absolute right-2 top-full mt-2 w-32 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden z-50"
+                  className="absolute top-full mt-2 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden z-50"
+                  style={{ right: 0, width: '80px', minWidth: '80px' }}
                 >
                   <button
                     onClick={() => {
                       setShowNewMenu(false);
                       handleNewChat();
                     }}
-                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors haptic-feedback whitespace-nowrap"
+                    className="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors haptic-feedback whitespace-nowrap"
                   >
                     新建对话
                   </button>
@@ -480,7 +723,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
                       setShowNewMenu(false);
                       handleOpenTicketDialog();
                     }}
-                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors haptic-feedback border-t border-gray-100 whitespace-nowrap"
+                    className="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors haptic-feedback border-t border-gray-100 whitespace-nowrap"
                   >
                     新建工单
                   </button>
@@ -771,7 +1014,19 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
               </div>
 
               <div className="max-h-[60vh] overflow-y-auto px-4 py-4">
-                {chatSessions.length === 0 ? (
+                {!hasCreatedNewChat ? (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <MessageSquare className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <p className="text-sm text-gray-500">创建新对话后，历史记录将显示在这里</p>
+                  </div>
+                ) : loadingHistory ? (
+                  <div className="text-center py-12">
+                    <Loader className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-4" />
+                    <p className="text-sm text-gray-500">加载历史对话...</p>
+                  </div>
+                ) : chatSessions.length === 0 ? (
                   <div className="text-center py-12">
                     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                       <MessageSquare className="w-8 h-8 text-gray-400" />
@@ -783,6 +1038,10 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
                     {chatSessions.map((session) => (
                       <button
                         key={session.id}
+                        onClick={() => {
+                          loadConversationDetail(session.id);
+                          setShowHistoryDialog(false);
+                        }}
                         className="w-full bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-400 hover:bg-blue-50 transition-all text-left haptic-feedback"
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -793,8 +1052,6 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
                             <div className="flex items-center gap-2 text-xs text-gray-500">
                               <Clock className="w-3 h-3" />
                               <span>{session.createdAt.toLocaleDateString('zh-CN')}</span>
-                              <span>•</span>
-                              <span>{session.messages.length} 条消息</span>
                             </div>
                           </div>
                         </div>
@@ -808,286 +1065,46 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
         )}
       </AnimatePresence>
 
-      {/* 创建工单弹窗 - 保持原有代码 */}
+      {/* 创建工单表单 */}
       <AnimatePresence>
-        {showTicketPrompt && aiExtractedInfo && (
+        {showTicketForm && (
+          <TicketForm
+            formData={ticketFormData}
+            onFormDataChange={setTicketFormData}
+            onSubmit={handleSubmitTicket}
+            onCancel={() => setShowTicketForm(false)}
+            submitting={ticketSubmitting}
+            error={ticketError}
+            showAIAssist={messages.filter(m => m.type === 'user').length > 0}
+            onAIAssist={handleAIAssist}
+            aiAssisting={aiAssisting}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* 工单创建成功提示 */}
+      <AnimatePresence>
+        {ticketCreated && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-end justify-center z-50"
-            onClick={() => setShowTicketPrompt(false)}
+            className="fixed top-20 left-1/2 -translate-x-1/2 z-50"
           >
             <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25 }}
-              className="bg-white w-full max-w-md rounded-t-3xl overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -20, opacity: 0 }}
+              className="bg-white px-6 py-4 rounded-2xl shadow-2xl border border-green-200"
             >
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">创建服务工单</h3>
-                <button
-                  onClick={() => setShowTicketPrompt(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <X className="w-5 h-5 text-gray-500" />
-                </button>
-              </div>
-
-              <div className="max-h-[70vh] overflow-y-auto px-6 py-4">
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-xl p-4 mb-4"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Sparkles className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900 mb-1 flex items-center gap-2">
-                        AI 已为您智能填充信息
-                        <motion.div
-                          animate={{ scale: [1, 1.2, 1] }}
-                          transition={{ repeat: Infinity, duration: 2 }}
-                        >
-                          ✨
-                        </motion.div>
-                      </h4>
-                      <p className="text-xs text-gray-600 mb-2">
-                        根据您的对话内容，我已自动提取关键信息。您可以选择使用或手动修改。
-                      </p>
-                      <button
-                        onClick={() => setUseAISuggestion(!useAISuggestion)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${useAISuggestion
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-white border border-gray-300 text-gray-700'
-                          }`}
-                      >
-                        <div className={`w-4 h-4 rounded flex items-center justify-center ${useAISuggestion ? 'bg-white/20' : 'bg-gray-100'
-                          }`}>
-                          {useAISuggestion && <Check className="w-3 h-3" />}
-                        </div>
-                        {useAISuggestion ? '已采纳 AI 建议' : '使用 AI 建议'}
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      问题类型
-                      {useAISuggestion && (
-                        <span className="ml-2 text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded">
-                          AI 推荐
-                        </span>
-                      )}
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { value: 'malfunction', label: '设备故障' },
-                        { value: 'maintenance', label: '维护保养' },
-                        { value: 'consultation', label: '使用咨询' },
-                        { value: 'parts', label: '配件需求' }
-                      ].map((type) => (
-                        <button
-                          key={type.value}
-                          onClick={() =>
-                            setTicketFormData({ ...ticketFormData, problemType: type.value })
-                          }
-                          className={`px-3 py-2 border rounded-lg text-sm transition-all ${ticketFormData.problemType === type.value
-                            ? 'border-purple-500 bg-purple-50 text-purple-700 font-medium'
-                            : 'border-gray-200 hover:border-gray-300'
-                            }`}
-                        >
-                          {type.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      优先级
-                      {useAISuggestion && (
-                        <span className="ml-2 text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded">
-                          AI 推荐
-                        </span>
-                      )}
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { value: 'low' as const, label: '低', color: 'gray' },
-                        { value: 'medium' as const, label: '中', color: 'blue' },
-                        { value: 'high' as const, label: '高', color: 'red' }
-                      ].map((priority) => (
-                        <button
-                          key={priority.value}
-                          onClick={() =>
-                            setTicketFormData({ ...ticketFormData, priority: priority.value })
-                          }
-                          className={`px-3 py-2 border rounded-lg text-sm transition-all ${ticketFormData.priority === priority.value
-                            ? `border-${priority.color}-500 bg-${priority.color}-50 text-${priority.color}-700 font-medium`
-                            : 'border-gray-200 hover:border-gray-300'
-                            }`}
-                        >
-                          {priority.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      问题摘要
-                      {useAISuggestion && aiExtractedInfo.problemSummary && (
-                        <span className="ml-2 text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded">
-                          AI 提取
-                        </span>
-                      )}
-                    </label>
-                    <input
-                      type="text"
-                      value={useAISuggestion ? aiExtractedInfo.problemSummary : ticketFormData.problemSummary}
-                      onChange={(e) =>
-                        setTicketFormData({ ...ticketFormData, problemSummary: e.target.value })
-                      }
-                      placeholder="简要描述问题..."
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        设备型号
-                      </label>
-                      <input
-                        type="text"
-                        value={ticketFormData.deviceModel}
-                        onChange={(e) =>
-                          setTicketFormData({ ...ticketFormData, deviceModel: e.target.value })
-                        }
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        设备 SN 码
-                      </label>
-                      <input
-                        type="text"
-                        value={ticketFormData.deviceSN}
-                        onChange={(e) =>
-                          setTicketFormData({ ...ticketFormData, deviceSN: e.target.value })
-                        }
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  {useAISuggestion && aiExtractedInfo.keyDialogues.length > 0 && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                        关键对话记录
-                        <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded">
-                          将自动附加到工单
-                        </span>
-                      </label>
-                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-32 overflow-y-auto">
-                        <div className="space-y-2">
-                          {aiExtractedInfo.keyDialogues.slice(0, 4).map((dialogue, index) => (
-                            <p key={index} className="text-xs text-gray-600 leading-relaxed">
-                              {dialogue}
-                            </p>
-                          ))}
-                          {aiExtractedInfo.keyDialogues.length > 4 && (
-                            <p className="text-xs text-gray-400 italic">
-                              还有 {aiExtractedInfo.keyDialogues.length - 4} 条对话记录...
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {aiExtractedInfo.images.length > 0 && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                        已上传图片
-                        <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded">
-                          {aiExtractedInfo.images.length} 张
-                        </span>
-                      </label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {aiExtractedInfo.images.map((image, index) => (
-                          <img
-                            key={index}
-                            src={image}
-                            alt={`上传的图片 ${index + 1}`}
-                            className="w-full h-20 object-cover rounded-lg border border-gray-200"
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      补充说明（选填）
-                    </label>
-                    <textarea
-                      value={ticketFormData.additionalNotes}
-                      onChange={(e) =>
-                        setTicketFormData({ ...ticketFormData, additionalNotes: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm resize-none"
-                      rows={3}
-                      placeholder="补充其他信息..."
-                    />
-                  </div>
-
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                      <div className="text-xs text-blue-800">
-                        <p className="font-medium mb-1">提交后将包含：</p>
-                        <ul className="space-y-0.5">
-                          <li>• 问题详细描述和完整对话记录</li>
-                          <li>• 所有上传的图片和视频</li>
-                          <li>• 设备信息和故障时间</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                  <Check className="w-6 h-6 text-green-600" />
                 </div>
-              </div>
-
-              <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-                <button
-                  onClick={() => {
-                    setShowTicketPrompt(false);
-                    setTicketCreated(true);
-
-                    const ticketMsg: Message = {
-                      id: Date.now().toString(),
-                      type: 'ai',
-                      content: `✅ 工单已创建成功！\n\n工单编号：WO${Date.now().toString().slice(-9)}\n问题类型：${getProblemTypeLabel(ticketFormData.problemType)}\n优先级：${getPriorityLabel(ticketFormData.priority)}\n\n我们的工程师将在2小时内与您联系。您可以在"工单"页面查看进度。`,
-                      timestamp: new Date()
-                    };
-                    setMessages(prev => [...prev, ticketMsg]);
-
-                    setTimeout(() => {
-                      onCreateTicket?.();
-                    }, 1500);
-                  }}
-                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-xl font-medium hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl haptic-feedback"
-                >
-                  确认创建工单
-                </button>
+                <div>
+                  <p className="font-semibold text-gray-900">工单创建成功！</p>
+                  <p className="text-sm text-gray-600">我们将尽快处理您的问题</p>
+                </div>
               </div>
             </motion.div>
           </motion.div>

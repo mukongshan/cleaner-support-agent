@@ -6,22 +6,24 @@ import {
     ArrowLeft
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { login } from '../services/api';
+import { register } from '../services/api';
 
-interface LoginPageProps {
-    onLoginSuccess: () => void;
+interface RegisterPageProps {
+    onRegisterSuccess: () => void;
     onClose?: () => void;
-    onSwitchToRegister?: () => void;
+    onSwitchToLogin?: () => void;
 }
 
-export function LoginPage({ onLoginSuccess, onClose, onSwitchToRegister }: LoginPageProps) {
+export function RegisterPage({ onRegisterSuccess, onClose, onSwitchToLogin }: RegisterPageProps) {
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    const handleLogin = async () => {
+    const handleRegister = async () => {
         // 表单验证
         if (!phone.trim()) {
             setError('请输入手机号');
@@ -43,21 +45,31 @@ export function LoginPage({ onLoginSuccess, onClose, onSwitchToRegister }: Login
             return;
         }
 
+        if (!confirmPassword.trim()) {
+            setError('请确认密码');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            setError('两次输入的密码不一致');
+            return;
+        }
+
         try {
             setLoading(true);
             setError('');
 
-            // 调用登录 API
-            await login({
+            // 调用注册 API
+            await register({
                 username: phone,
                 password: password,
-                loginType: 'password'
+                confirmPassword: confirmPassword
             });
 
-            // 登录成功
-            onLoginSuccess();
+            // 注册成功
+            onRegisterSuccess();
         } catch (err: any) {
-            setError(err.message || '登录失败，请检查手机号和密码');
+            setError(err.message || '注册失败，请稍后重试');
         } finally {
             setLoading(false);
         }
@@ -65,7 +77,7 @@ export function LoginPage({ onLoginSuccess, onClose, onSwitchToRegister }: Login
 
     const handleKeyPress = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {
-            handleLogin();
+            handleRegister();
         }
     };
 
@@ -82,7 +94,7 @@ export function LoginPage({ onLoginSuccess, onClose, onSwitchToRegister }: Login
                             <ArrowLeft className="w-5 h-5 text-gray-700" />
                         </button>
                     )}
-                    <h2 className="text-lg font-semibold text-gray-900">登录</h2>
+                    <h2 className="text-lg font-semibold text-gray-900">注册</h2>
                 </div>
 
                 {/* 表单内容 */}
@@ -119,7 +131,7 @@ export function LoginPage({ onLoginSuccess, onClose, onSwitchToRegister }: Login
                         </div>
 
                         {/* 密码输入 */}
-                        <div className="mb-6">
+                        <div className="mb-4">
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 请输入密码
                             </label>
@@ -132,7 +144,7 @@ export function LoginPage({ onLoginSuccess, onClose, onSwitchToRegister }: Login
                                         setError('');
                                     }}
                                     onKeyPress={handleKeyPress}
-                                    placeholder="密码"
+                                    placeholder="密码（至少6位）"
                                     className="w-full px-4 pr-12 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
                                 />
                                 <button
@@ -149,29 +161,60 @@ export function LoginPage({ onLoginSuccess, onClose, onSwitchToRegister }: Login
                             </div>
                         </div>
 
-                        {/* 去注册提示 */}
+                        {/* 确认密码输入 */}
+                        <div className="mb-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                请确认密码
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type={showConfirmPassword ? 'text' : 'password'}
+                                    value={confirmPassword}
+                                    onChange={(e) => {
+                                        setConfirmPassword(e.target.value);
+                                        setError('');
+                                    }}
+                                    onKeyPress={handleKeyPress}
+                                    placeholder="再次输入密码"
+                                    className="w-full px-4 pr-12 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                >
+                                    {showConfirmPassword ? (
+                                        <EyeOff className="w-5 h-5" />
+                                    ) : (
+                                        <Eye className="w-5 h-5" />
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* 去登录提示 */}
                         <div className="mb-6 flex justify-end">
                             <button
-                                onClick={onSwitchToRegister}
+                                onClick={onSwitchToLogin}
                                 className="text-sm text-blue-600 hover:text-blue-700 transition-colors"
                             >
-                                还没有账号？去注册
+                                已有账号？去登录
                             </button>
                         </div>
 
-                        {/* 登录按钮 */}
+                        {/* 注册按钮 */}
                         <button
-                            onClick={handleLogin}
+                            onClick={handleRegister}
                             disabled={loading}
                             className="w-full bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 haptic-feedback"
                         >
                             {loading ? (
                                 <>
                                     <Loader className="w-5 h-5 animate-spin" />
-                                    <span>登录中...</span>
+                                    <span>注册中...</span>
                                 </>
                             ) : (
-                                <span>登录</span>
+                                <span>注册</span>
                             )}
                         </button>
                     </div>

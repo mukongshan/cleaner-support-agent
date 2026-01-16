@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Clock,
   CheckCircle,
@@ -20,9 +20,18 @@ import {
   X,
   Sparkles,
   Check,
-  Bot
+  Bot,
+  Loader
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { 
+  getTickets, 
+  createTicket, 
+  TicketListItem, 
+  TicketStatus as APITicketStatus,
+  TicketPriority,
+  uploadMedia 
+} from '../services/api';
 
 export type TicketStatus = 'pending' | 'processing' | 'completed' | 'cancelled';
 
@@ -71,8 +80,56 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
     additionalNotes: '',
     images: []
   });
+  
+  // 真实数据状态
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const tickets: Ticket[] = [
+  // 加载工单列表
+  useEffect(() => {
+    loadTickets();
+  }, [selectedFilter]);
+
+  const loadTickets = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const filterStatus: APITicketStatus | undefined = 
+        selectedFilter === 'all' ? undefined : selectedFilter as APITicketStatus;
+      
+      const apiTickets = await getTickets(filterStatus);
+      
+      // 转换 API 数据为组件需要的格式
+      const convertedTickets: Ticket[] = apiTickets.map(item => ({
+        id: item.ticketId,
+        title: item.title,
+        description: '', // 列表接口不返回描述
+        status: item.status,
+        priority: item.priority,
+        type: 'report' as const,
+        createdAt: new Date(item.createdAt),
+        updatedAt: new Date(item.createdAt),
+        assignedTo: item.engineerName,
+        estimatedTime: item.estimatedTime,
+        hasImage: false
+      }));
+      
+      setTickets(convertedTickets);
+    } catch (err: any) {
+      console.error('加载工单失败:', err);
+      setError(err.message || '加载工单失败');
+      // 使用空数组而不是模拟数据
+      setTickets([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 原来的模拟数据现在作为备用（开发时使用）
+  const mockTickets: Ticket[] = [
     {
       id: 'WO20240112001',
       title: '悬空传感器异常',
@@ -222,11 +279,53 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
     setShowTicketForm(true);
   };
 
-  const handleSubmitTicket = () => {
-    setShowTicketForm(false);
-    // 这里可以添加创建工单的逻辑
-    if (onCreateTicket) {
-      onCreateTicket();
+  const handleSubmitTicket = async () => {
+    try {
+      setSubmitting(true);
+      setError(null);
+
+      // 上传图片
+      const uploadedUrls: string[] = [];
+      for (const imageUrl of ticketFormData.images) {
+        // 如果是本地文件路径，需要上传
+        // 这里假设 images 数组已经包含了上传后的 URL
+        uploadedUrls.push(imageUrl);
+      }
+
+      // 创建工单
+      const result = await createTicket({
+        title: ticketFormData.problemSummary || '工单',
+        description: `问题类型: ${ticketFormData.problemType}\n设备型号: ${ticketFormData.deviceModel}\n设备SN: ${ticketFormData.deviceSN}\n\n${ticketFormData.additionalNotes}`,
+        priority: ticketFormData.priority as TicketPriority,
+        attachmentUrls: uploadedUrls.length > 0 ? uploadedUrls : undefined
+      });
+
+      console.log('工单创建成功:', result);
+      
+      // 重置表单
+      setTicketFormData({
+        problemType: 'maintenance',
+        priority: 'medium',
+        problemSummary: '',
+        deviceModel: 'CR-X3000',
+        deviceSN: 'SN202401120001',
+        additionalNotes: '',
+        images: []
+      });
+      
+      setShowTicketForm(false);
+      
+      // 重新加载工单列表
+      await loadTickets();
+      
+      if (onCreateTicket) {
+        onCreateTicket();
+      }
+    } catch (err: any) {
+      console.error('创建工单失败:', err);
+      setError(err.message || '创建工单失败');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -315,7 +414,26 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
 
       {/* 工单列表 */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
-        {filteredTickets.length === 0 ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center h-full">
+            <Loader className="w-12 h-12 text-blue-600 animate-spin mb-4" />
+            <p className="text-sm text-gray-500">加载工单中...</p>
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center h-full text-center px-8">
+            <div className="w-24 h-24 bg-red-50 rounded-full flex items-center justify-center mb-4">
+              <AlertCircle className="w-12 h-12 text-red-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">加载失败</h3>
+            <p className="text-sm text-gray-500 mb-4">{error}</p>
+            <button
+              onClick={loadTickets}
+              className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
+            >
+              重试
+            </button>
+          </div>
+        ) : filteredTickets.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-8">
             <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
               <FileText className="w-12 h-12 text-gray-400" />
@@ -712,11 +830,24 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
               </div>
 
               <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                {error && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+                    {error}
+                  </div>
+                )}
                 <button
                   onClick={handleSubmitTicket}
-                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl haptic-feedback"
+                  disabled={submitting}
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl haptic-feedback disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  确认创建工单
+                  {submitting ? (
+                    <>
+                      <Loader className="w-5 h-5 animate-spin" />
+                      <span>创建中...</span>
+                    </>
+                  ) : (
+                    <span>确认创建工单</span>
+                  )}
                 </button>
               </div>
             </motion.div>

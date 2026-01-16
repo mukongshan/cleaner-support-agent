@@ -1,7 +1,7 @@
 # 数据库
 $env:SPRING_DATASOURCE_URL="jdbc:mysql://localhost:3306/cleaner_support?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai"
-$env:SPRING_DATASOURCE_USERNAME="kongshan"
-$env:SPRING_DATASOURCE_PASSWORD="zmt20041204"
+$env:SPRING_DATASOURCE_USERNAME="root"
+$env:SPRING_DATASOURCE_PASSWORD="123456"
 
 # AI服务
 $env:APP_AI_BASE_URL="https://api.dify.ai/v1"

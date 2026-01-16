@@ -6,6 +6,7 @@ import { KnowledgePage } from './components/KnowledgePage';
 import { TicketsPage, Ticket } from './components/TicketsPage';
 import { TicketDetailPage } from './components/TicketDetailPage';
 import { LoginPage } from './components/LoginPage';
+import { RegisterPage } from './components/RegisterPage';
 import { Home as HomeIcon, MessageSquare, User, BookOpen, ClipboardList } from 'lucide-react';
 import { getToken } from './services/api';
 
@@ -15,6 +16,7 @@ export type UserRole = 'dealer' | 'enduser';
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('chat'); // 默认显示问答界面
   const [initialChatMessage, setInitialChatMessage] = useState<string>('');
   const [userRole, setUserRole] = useState<UserRole>('enduser'); // 默认终端用户
@@ -56,12 +58,33 @@ export default function App() {
     setShowLogin(false);
   };
 
+  const handleRegisterSuccess = () => {
+    setIsLoggedIn(true);
+    setShowRegister(false);
+  };
+
   const handleLogout = () => {
     setIsLoggedIn(false);
     setActiveTab('chat');
   };
 
   const handleShowLogin = () => {
+    setShowLogin(true);
+    setShowRegister(false);
+  };
+
+  const handleShowRegister = () => {
+    setShowRegister(true);
+    setShowLogin(false);
+  };
+
+  const handleSwitchToRegister = () => {
+    setShowLogin(false);
+    setShowRegister(true);
+  };
+
+  const handleSwitchToLogin = () => {
+    setShowRegister(false);
     setShowLogin(true);
   };
 
@@ -105,6 +128,16 @@ export default function App() {
         <LoginPage 
           onLoginSuccess={handleLoginSuccess}
           onClose={() => setShowLogin(false)}
+          onSwitchToRegister={handleSwitchToRegister}
+        />
+      )}
+
+      {/* 注册页面 */}
+      {showRegister && (
+        <RegisterPage 
+          onRegisterSuccess={handleRegisterSuccess}
+          onClose={() => setShowRegister(false)}
+          onSwitchToLogin={handleSwitchToLogin}
         />
       )}
 
