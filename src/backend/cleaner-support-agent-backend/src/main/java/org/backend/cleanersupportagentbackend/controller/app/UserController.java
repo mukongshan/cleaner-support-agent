@@ -4,6 +4,7 @@ import org.backend.cleanersupportagentbackend.annotation.CurrentUserId;
 import org.backend.cleanersupportagentbackend.controller.ApiResponse;
 import org.backend.cleanersupportagentbackend.dto.LoginRequest;
 import org.backend.cleanersupportagentbackend.dto.LoginResponse;
+import org.backend.cleanersupportagentbackend.dto.RegisterRequest;
 import org.backend.cleanersupportagentbackend.dto.UpdateUserProfileRequest;
 import org.backend.cleanersupportagentbackend.dto.UserProfileResponse;
 import org.backend.cleanersupportagentbackend.service.UserService;
@@ -12,12 +13,22 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/cleaner-support/v2/users")
-public class AuthController {
+public class UserController {
 
     private final UserService userService;
 
-    public AuthController(UserService userService) {
+    public UserController(UserService userService) {
         this.userService = userService;
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<ApiResponse<LoginResponse>> register(@RequestBody RegisterRequest request) {
+        try {
+            LoginResponse response = userService.register(request);
+            return ResponseEntity.ok(ApiResponse.success(response));
+        } catch (Exception e) {
+            return ResponseEntity.ok(ApiResponse.error(400, e.getMessage()));
+        }
     }
 
     @PostMapping("/login")

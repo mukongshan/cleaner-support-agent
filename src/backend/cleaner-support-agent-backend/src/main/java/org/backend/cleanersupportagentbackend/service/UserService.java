@@ -2,11 +2,14 @@ package org.backend.cleanersupportagentbackend.service;
 
 import org.backend.cleanersupportagentbackend.dto.LoginRequest;
 import org.backend.cleanersupportagentbackend.dto.LoginResponse;
+import org.backend.cleanersupportagentbackend.dto.RegisterRequest;
 import org.backend.cleanersupportagentbackend.dto.UpdateUserProfileRequest;
 import org.backend.cleanersupportagentbackend.dto.UserProfileResponse;
 import org.backend.cleanersupportagentbackend.entity.User;
 import org.backend.cleanersupportagentbackend.repository.UserRepository;
 import org.backend.cleanersupportagentbackend.util.IdGenerator;
+import org.backend.cleanersupportagentbackend.util.TokenUtil;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,42 +19,87 @@ import java.util.Optional;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final TokenUtil tokenUtil;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, TokenUtil tokenUtil, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
+        this.tokenUtil = tokenUtil;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    /**
+     * 用户注册
+     */
+    @Transactional
+    public LoginResponse register(RegisterRequest request) {
+        // 检查手机号是否已存在
+        if (userRepository.existsByPhone(request.getPhone())) {
+            throw new RuntimeException("该手机号已被注册");
+        }
+        
+        // 验证密码不为空
+        if (request.getPassword() == null || request.getPassword().trim().isEmpty()) {
+            throw new RuntimeException("密码不能为空");
+        }
+        
+        // 生成默认昵称（如果未提供）
+        String nickname = request.getNickname();
+        if (nickname == null || nickname.trim().isEmpty()) {
+            // 从手机号后4位生成默认昵称
+            String phone = request.getPhone();
+            nickname = "用户" + (phone.length() >= 4 ? phone.substring(phone.length() - 4) : phone);
+        }
+        
+        // 加密密码
+        String encodedPassword = passwordEncoder.encode(request.getPassword());
+        
+        // 创建新用户
+        User newUser = User.builder()
+                .userId(IdGenerator.generateUserId())
+                .phone(request.getPhone())
+                .password(encodedPassword)
+                .nickname(nickname)
+                .memberTag("普通用户")
+                .role("user")
+                .build();
+        userRepository.save(newUser);
+        
+        // 生成JWT token
+        String token = tokenUtil.generateToken(newUser.getUserId());
+        
+        return LoginResponse.builder()
+                .token(token)
+                .userId(newUser.getUserId())
+                .nickname(newUser.getNickname())
+                .avatar(newUser.getAvatar())
+                .build();
     }
 
     /**
      * 用户登录
-     * TODO: 实现密码加密验证和JWT token生成
      */
     @Transactional
     public LoginResponse login(LoginRequest request) {
         Optional<User> userOpt = userRepository.findByPhone(request.getUsername());
         
         if (userOpt.isEmpty()) {
-            // 如果用户不存在，创建新用户（简化处理，实际应该先注册）
-            User newUser = User.builder()
-                    .userId(IdGenerator.generateUserId())
-                    .phone(request.getUsername())
-                    .password(request.getPassword()) // TODO: 加密存储
-                    .nickname("用户" + request.getUsername().substring(7))
-                    .memberTag("普通用户")
-                    .role("user")
-                    .build();
-            userRepository.save(newUser);
-            return LoginResponse.builder()
-                    .token("mock_token_" + newUser.getUserId()) // TODO: 生成真实JWT
-                    .userId(newUser.getUserId())
-                    .nickname(newUser.getNickname())
-                    .avatar(newUser.getAvatar())
-                    .build();
+            throw new RuntimeException("用户名或密码错误");
         }
 
         User user = userOpt.get();
-        // TODO: 验证密码
+        
+        // 验证密码
+        if (request.getPassword() == null || 
+            !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new RuntimeException("用户名或密码错误");
+        }
+        
+        // 生成JWT token
+        String token = tokenUtil.generateToken(user.getUserId());
+        
         return LoginResponse.builder()
-                .token("mock_token_" + user.getUserId()) // TODO: 生成真实JWT
+                .token(token)
                 .userId(user.getUserId())
                 .nickname(user.getNickname())
                 .avatar(user.getAvatar())

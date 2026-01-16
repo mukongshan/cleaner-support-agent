@@ -15,6 +15,7 @@ public class AuthInterceptor implements HandlerInterceptor {
     // 不需要登录的路径
     private static final String[] PUBLIC_PATHS = {
             "/api/cleaner-support/v2/users/login",
+            "/api/cleaner-support/v2/users/register",
             "/api/cleaner-support/v2/media/files",  // 媒体文件列表和详情可以公开访问
             "/mcp/"  // MCP接口不需要登录
     };
