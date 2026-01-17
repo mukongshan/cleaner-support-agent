@@ -64,9 +64,14 @@ export function sendAIMessage(
   const token = getToken();
   const url = `${API_BASE_URL}/ai/chat`;
 
+  console.log('🚀 sendAIMessage 函数开始执行');
+  console.log('📍 请求URL:', url);
+  console.log('🔑 Token:', token ? '存在' : '不存在');
+  console.log('📦 请求参数:', params);
+
   // 使用 fetch 处理 SSE 流式响应
   const controller = new AbortController();
-  
+
   fetch(url, {
     method: 'POST',
     headers: {
@@ -77,40 +82,59 @@ export function sendAIMessage(
     signal: controller.signal,
   })
     .then(async (response) => {
+      console.log('📨 收到响应:', response.status, response.statusText);
+      console.log('📄 响应头:', Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('❌ HTTP 错误响应:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
       }
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
 
       if (!reader) {
+        console.error('❌ Response body 为 null');
         throw new Error('Response body is null');
       }
+
+      console.log('✅ 开始读取流式数据');
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
+          console.log('✅ 流式数据读取完成');
           onComplete?.();
           break;
         }
 
         const chunk = decoder.decode(value);
+        console.log('📦 收到数据块:', chunk);
         const lines = chunk.split('\n');
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
+          // 处理 SSE 数据行，支持 "data: " 和 "data:" 两种格式
+          if (line.startsWith('data:')) {
             try {
-              const data = JSON.parse(line.slice(6));
-              onMessage(data);
+              // 去掉 "data:" 前缀，同时去除可能的空格
+              const jsonStr = line.slice(5).trim();
+              if (jsonStr) {
+                const data = JSON.parse(jsonStr);
+                console.log('✅ 解析 SSE 数据成功:', data);
+                onMessage(data);
+              }
             } catch (e) {
-              console.error('Failed to parse SSE data:', e);
+              console.error('❌ 解析 SSE 数据失败:', line, e);
             }
           }
         }
       }
     })
     .catch((error) => {
+      console.error('❌ Fetch 错误:', error);
+      console.error('错误名称:', error.name);
+      console.error('错误消息:', error.message);
       if (error.name !== 'AbortError') {
         onError?.(error);
       }
