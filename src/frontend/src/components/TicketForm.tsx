@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { X, Loader, Sparkles, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -117,8 +117,8 @@ export function TicketForm({
                       key={type.value}
                       onClick={() => updateFormData('problemType', type.value)}
                       className={`px-3 py-2 border rounded-lg text-sm transition-all haptic-feedback ${formData.problemType === type.value
-                          ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium'
-                          : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium'
+                        : 'border-gray-200 hover:border-gray-300'
                         }`}
                     >
                       {type.label}
@@ -138,12 +138,12 @@ export function TicketForm({
                       key={priority.value}
                       onClick={() => updateFormData('priority', priority.value)}
                       className={`px-3 py-2 border rounded-lg text-sm transition-all haptic-feedback ${formData.priority === priority.value
-                          ? priority.value === 'high'
-                            ? 'border-red-500 bg-red-50 text-red-700 font-medium'
-                            : priority.value === 'medium'
-                              ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium'
-                              : 'border-gray-500 bg-gray-50 text-gray-700 font-medium'
-                          : 'border-gray-200 hover:border-gray-300'
+                        ? priority.value === 'high'
+                          ? 'border-red-500 bg-red-50 text-red-700 font-medium'
+                          : priority.value === 'medium'
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium'
+                            : 'border-gray-500 bg-gray-50 text-gray-700 font-medium'
+                        : 'border-gray-200 hover:border-gray-300'
                         }`}
                     >
                       {priority.label}

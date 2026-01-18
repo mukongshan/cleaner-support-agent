@@ -41,8 +41,7 @@ export function KnowledgePage() {
     { id: 'all', name: '全部', icon: Book, color: 'blue' },
     { id: 'guide', name: '操作指南', icon: Book, color: 'blue' },
     { id: 'maintenance', name: '维护保养', icon: Wrench, color: 'green' },
-    { id: 'demo', name: '产品演示', icon: Video, color: 'purple' },
-    { id: 'shop', name: '配件商城', icon: ShoppingCart, color: 'orange' }
+    { id: 'demo', name: '产品演示', icon: Video, color: 'purple' }
   ];
 
   const knowledgeData: KnowledgeItem[] = [
@@ -171,6 +170,9 @@ export function KnowledgePage() {
   ];
 
   const filteredData = knowledgeData.filter(item => {
+    // 过滤掉商城分类的内容
+    if (item.category === 'shop') return false;
+
     const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
     const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.description.toLowerCase().includes(searchQuery.toLowerCase());
@@ -292,30 +294,7 @@ export function KnowledgePage() {
                           <span>{item.duration}</span>
                         </div>
                       )}
-
-                      {item.rating && (
-                        <div className="flex items-center gap-1">
-                          <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                          <span>{item.rating}</span>
-                        </div>
-                      )}
-
-                      {item.views && (
-                        <span>{item.views} 次观看</span>
-                      )}
                     </div>
-
-                    {/* 商城特殊标签 */}
-                    {item.category === 'shop' && (
-                      <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between">
-                        <span className="text-sm font-semibold text-orange-600">
-                          ¥{(Math.random() * 50 + 30).toFixed(0)}
-                        </span>
-                        <button className="px-3 py-1 bg-orange-50 text-orange-600 rounded-lg text-xs hover:bg-orange-100 transition-colors">
-                          查看详情
-                        </button>
-                      </div>
-                    )}
                   </div>
                 </div>
               </motion.button>
@@ -324,13 +303,13 @@ export function KnowledgePage() {
         )}
       </div>
 
-      {/* 底部提示 */}
+      {/* 底部提示
       <div className="bg-white border-t border-gray-100 px-4 py-3 safe-area-bottom">
         <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
           <Download className="w-4 h-4" />
           <span>所有资料支持离线下载和收藏</span>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 }

@@ -352,7 +352,7 @@ export function ProfilePage({ userRole, onRoleChange, onLogout, isLoggedIn, onSh
         </motion.div>
       </div>
 
-      {/* 设备信息卡片 */}
+      {/* 设备信息卡片
       <div className="px-4 mb-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -407,7 +407,7 @@ export function ProfilePage({ userRole, onRoleChange, onLogout, isLoggedIn, onSh
             </div>
           </div>
         </motion.div>
-      </div>
+      </div> */}
 
       {/* 服务管理 */}
       <div className="px-4">

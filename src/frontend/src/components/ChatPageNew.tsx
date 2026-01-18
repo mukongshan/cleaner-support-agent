@@ -28,6 +28,7 @@ import {
   Conversation,
   ConversationDetail
 } from '../services/api';
+import { getToken } from '../services/api/config';
 import { TicketForm } from './TicketForm';
 
 interface Message {
@@ -81,6 +82,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [hasCreatedNewChat, setHasCreatedNewChat] = useState(false); // 是否创建过新对话
+  const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false); // 是否已完成初始加载
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -282,7 +284,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
       document.body.style.position = 'fixed';
       document.body.style.top = `-${scrollY}px`;
       document.body.style.width = '100%';
-      
+
       return () => {
         // 恢复滚动位置
         document.body.style.position = '';
@@ -300,7 +302,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
       document.body.style.position = 'fixed';
       document.body.style.top = `-${scrollY}px`;
       document.body.style.width = '100%';
-      
+
       return () => {
         document.body.style.position = '';
         document.body.style.top = '';
@@ -317,7 +319,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
       document.body.style.position = 'fixed';
       document.body.style.top = `-${scrollY}px`;
       document.body.style.width = '100%';
-      
+
       return () => {
         document.body.style.position = '';
         document.body.style.top = '';
@@ -327,12 +329,56 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
     }
   }, [showTicketForm]);
 
-  // 处理初始消息
+  // 组件挂载时自动加载最近的对话
   useEffect(() => {
-    if (initialMessage && initialMessage.trim()) {
-      handleSendMessage(initialMessage);
-    }
-  }, [initialMessage]);
+    const loadRecentConversation = async () => {
+      // 如果有 initialMessage，则不加载历史对话
+      if (initialMessage && initialMessage.trim()) {
+        setIsInitialLoadComplete(true);
+        return;
+      }
+
+      // 检查用户是否已登录，未登录则不加载历史对话
+      const token = getToken();
+      if (!token) {
+        setIsInitialLoadComplete(true);
+        return;
+      }
+
+      try {
+        setLoadingConversation(true);
+        // 获取历史会话列表
+        const conversations = await getConversations();
+
+        if (conversations && conversations.length > 0) {
+          // 加载最近的一条对话
+          const latestConversation = conversations[0];
+          const detail = await getConversationDetail(latestConversation.id);
+
+          // 转换消息格式
+          const convertedMessages: Message[] = detail.messages.map((msg, index) => ({
+            id: `${latestConversation.id}-${index}`,
+            type: msg.role === 'user' ? 'user' : 'ai',
+            content: msg.content,
+            timestamp: new Date(msg.timestamp),
+            rating: null
+          }));
+
+          setMessages(convertedMessages);
+          setCurrentSessionId(latestConversation.id);
+          setIsHistoryConversation(true);
+        }
+      } catch (error) {
+        console.error('加载最近对话失败:', error);
+        // 失败时保持默认的欢迎消息
+      } finally {
+        setLoadingConversation(false);
+        setIsInitialLoadComplete(true);
+      }
+    };
+
+    loadRecentConversation();
+  }, []); // 只在组件挂载时执行一次
 
   const handleSendMessage = (text: string) => {
     if (!text.trim()) return;
@@ -533,6 +579,15 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
     // cancelRequest 可用于取消请求，例如用户快速发送新消息或组件卸载时
     // 当前未使用，但保留以便将来需要时使用
   };
+
+  // 处理初始消息
+  useEffect(() => {
+    // 等待初始加载完成后再处理 initialMessage
+    if (isInitialLoadComplete && initialMessage && initialMessage.trim()) {
+      handleSendMessage(initialMessage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialMessage, isInitialLoadComplete]);
 
   const getAIResponse = (userText: string): string => {
     const lowerText = userText.toLowerCase();
@@ -810,19 +865,39 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
             const isLastAI = message.type === 'ai' && index === lastAIMessageIndex && !aiThinking;
 
             return (
-              <div
+              <motion.div
                 key={message.id}
+                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{
+                  type: 'spring',
+                  stiffness: 300,
+                  damping: 25,
+                  duration: 0.4
+                }}
                 className={`flex flex-col ${message.type === 'user' ? 'items-end' : 'items-start'}`}
               >
                 <div className={`max-w-[80%]`}>
                   {message.type === 'ai' && (
-                    <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center mb-2">
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                      className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center mb-2"
+                    >
                       <span className="text-white text-sm font-semibold">AI</span>
-                    </div>
+                    </motion.div>
                   )}
 
-                  <div
-                    className={`rounded-2xl px-4 py-3 ${message.type === 'user'
+                  <motion.div
+                    whileHover={{
+                      scale: 1.02,
+                      boxShadow: message.type === 'user'
+                        ? '0 10px 25px -5px rgba(59, 130, 246, 0.3)'
+                        : '0 10px 25px -5px rgba(0, 0, 0, 0.15)',
+                      transition: { duration: 0.2 }
+                    }}
+                    className={`rounded-2xl px-4 py-3 cursor-default ${message.type === 'user'
                       ? 'bg-blue-600 text-white rounded-tr-sm'
                       : 'bg-white text-gray-900 rounded-tl-sm shadow-sm'
                       }`}
@@ -844,29 +919,41 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
                         </div>
                       </div>
                     )}
-                  </div>
+                  </motion.div>
 
                   {/* AI回答评价按钮 */}
                   {message.type === 'ai' && (
                     <div className="flex items-center gap-2 mt-2 ml-1">
-                      <button
+                      <motion.button
                         onClick={() => handleRateMessage(message.id, 'like')}
+                        whileTap={{
+                          scale: 0.85,
+                          rotate: message.rating === 'like' ? [0, -10, 10, -10, 0] : 0
+                        }}
+                        whileHover={{ scale: 1.1 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                         className={`p-1.5 rounded-lg transition-all haptic-feedback ${message.rating === 'like'
                           ? 'bg-green-100 text-green-600'
                           : 'hover:bg-gray-100 text-gray-400'
                           }`}
                       >
                         <ThumbsUp className="w-4 h-4" />
-                      </button>
-                      <button
+                      </motion.button>
+                      <motion.button
                         onClick={() => handleRateMessage(message.id, 'dislike')}
+                        whileTap={{
+                          scale: 0.85,
+                          rotate: message.rating === 'dislike' ? [0, 10, -10, 10, 0] : 0
+                        }}
+                        whileHover={{ scale: 1.1 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                         className={`p-1.5 rounded-lg transition-all haptic-feedback ${message.rating === 'dislike'
                           ? 'bg-red-100 text-red-600'
                           : 'hover:bg-gray-100 text-gray-400'
                           }`}
                       >
                         <ThumbsDown className="w-4 h-4" />
-                      </button>
+                      </motion.button>
                       <span className="text-xs text-gray-400 ml-1">
                         {message.timestamp.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
                       </span>
@@ -888,32 +975,49 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
                       : getFollowUpQuestions(message.content);
 
                     return (
-                      <div className="mt-3 ml-1">
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3, duration: 0.4 }}
+                        className="mt-3 ml-1"
+                      >
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-1 text-xs text-gray-500">
                             <MessageSquare className="w-3 h-3" />
                             <span>继续问我</span>
                           </div>
-                          <button
+                          <motion.button
                             onClick={() => refreshFollowUpQuestions(message.content)}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95, rotate: 180 }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                             className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors haptic-feedback"
                           >
                             <RefreshCw className="w-3 h-3" />
                             <span>换一换</span>
-                          </button>
+                          </motion.button>
                         </div>
                         <div className="space-y-2">
                           {questionsToShow.slice(0, 3).map((question, qIndex) => (
-                            <button
+                            <motion.button
                               key={qIndex}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: 0.4 + qIndex * 0.1 }}
+                              whileHover={{
+                                scale: 1.02,
+                                x: 4,
+                                transition: { duration: 0.2 }
+                              }}
+                              whileTap={{ scale: 0.98 }}
                               onClick={() => handleSendMessage(question)}
                               className="w-full text-left px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs text-gray-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 transition-colors haptic-feedback"
                             >
                               {question}
-                            </button>
+                            </motion.button>
                           ))}
                         </div>
-                      </div>
+                      </motion.div>
                     );
                   })()}
 
@@ -923,30 +1027,69 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
                     </div>
                   )}
                 </div>
-              </div>
+              </motion.div>
             );
           })
         )}
 
         {aiThinking && (
-          <div className="flex justify-start">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="flex justify-start"
+          >
             <div className="max-w-[80%]">
-              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center mb-2">
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center mb-2"
+              >
                 <span className="text-white text-sm font-semibold">AI</span>
-              </div>
-              <div className="bg-white rounded-2xl rounded-tl-sm shadow-sm px-4 py-3">
-                <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+              </motion.div>
+              <motion.div
+                initial={{ scale: 0.95 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.2 }}
+                className="bg-white rounded-2xl rounded-tl-sm shadow-sm px-4 py-3"
+              >
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex items-center gap-2 text-sm text-gray-600 mb-2"
+                >
                   <Loader className="w-4 h-4 animate-spin" />
-                  <span>{thinkingSteps[thinkingStep]}</span>
-                </div>
+                  <motion.span
+                    key={thinkingStep}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    {thinkingSteps[thinkingStep]}
+                  </motion.span>
+                </motion.div>
                 <div className="flex gap-1">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full typing-dot" />
-                  <div className="w-2 h-2 bg-gray-400 rounded-full typing-dot" />
-                  <div className="w-2 h-2 bg-gray-400 rounded-full typing-dot" />
+                  {[0, 1, 2].map((i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ scale: 0 }}
+                      animate={{ scale: [0, 1, 0] }}
+                      transition={{
+                        duration: 1.5,
+                        repeat: Infinity,
+                        delay: i * 0.2,
+                        ease: 'easeInOut'
+                      }}
+                      className="w-2 h-2 bg-gray-400 rounded-full"
+                    />
+                  ))}
                 </div>
-              </div>
+              </motion.div>
             </div>
-          </div>
+          </motion.div>
         )}
 
         <div ref={messagesEndRef} />
