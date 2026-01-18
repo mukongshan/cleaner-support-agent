@@ -114,9 +114,9 @@ export function ProfilePage({ userRole, onRoleChange, onLogout, isLoggedIn, onSh
     phone: userProfile.phone,
     avatar: getAvatarUrl(userProfile.avatar, userProfile.nickname)
   } : {
-    name: '张先生',
-    phone: '138****8888',
-    avatar: 'https://ui-avatars.com/api/?name=Zhang&background=3b82f6&color=fff&size=128'
+    name: '用户',
+    phone: '',
+    avatar: ''
   };
 
   const deviceInfo = {
@@ -227,31 +227,44 @@ export function ProfilePage({ userRole, onRoleChange, onLogout, isLoggedIn, onSh
       {/* 个人信息区 */}
       <div className="bg-gradient-to-br from-blue-600 to-blue-700 px-4 pt-6 pb-20">
         {isLoggedIn ? (
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-white overflow-hidden">
-              <img
-                src={userData.avatar}
-                alt={userData.name}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  console.error('顶部头像加载失败:', userData.avatar);
-                  const target = e.currentTarget;
-                  // 如果加载失败，使用默认头像
-                  if (userProfile?.nickname) {
-                    target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(userProfile.nickname)}&background=3b82f6&color=fff&size=128`;
-                  }
-                }}
-              />
-            </div>
-            <div className="flex-1 text-white">
-              <h2 className="text-xl font-semibold mb-1">{userData.name}</h2>
-              <div className="flex items-center gap-2 text-blue-100 text-sm">
-                <Smartphone className="w-4 h-4" />
-                <span>{userData.phone}</span>
+          // 状态1：已登录
+          <>
+            {/* 如果正在加载 或 数据尚未准备好，显示骨架屏（Loading占位） */}
+            {loading || !userData ? (
+              <div className="flex items-center gap-4 animate-pulse">
+                <div className="w-16 h-16 rounded-full bg-white/20"></div>
+                <div className="flex-1 space-y-2">
+                  <div className="h-6 w-24 bg-white/20 rounded"></div>
+                  <div className="h-4 w-32 bg-white/20 rounded"></div>
+                </div>
               </div>
-            </div>
-          </div>
+            ) : (
+              // 数据加载完成，显示真实用户信息
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-white overflow-hidden">
+                  <img
+                    src={userData.avatar}
+                    alt={userData.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // ... 原有的错误处理逻辑保持不变
+                      const target = e.currentTarget;
+                      target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name)}&background=3b82f6&color=fff&size=128`;
+                    }}
+                  />
+                </div>
+                <div className="flex-1 text-white">
+                  <h2 className="text-xl font-semibold mb-1">{userData.name}</h2>
+                  <div className="flex items-center gap-2 text-blue-100 text-sm">
+                    <Smartphone className="w-4 h-4" />
+                    <span>{userData.phone}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         ) : (
+          // 状态2：未登录 (保持原样)
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center">
               <User className="w-8 h-8 text-white" />

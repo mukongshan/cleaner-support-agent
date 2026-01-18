@@ -1869,3 +1869,22 @@ body {
     transform: rotate(360deg);
   }
 }
+
+/* 防止页面过度滚动（橡皮筋效果） */
+html, body {
+  overscroll-behavior: none;
+  overflow: hidden;
+  height: 100%;
+  width: 100%;
+}
+
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* 防止触摸拖动导致页面移动 */
+body {
+  touch-action: pan-y;
+}

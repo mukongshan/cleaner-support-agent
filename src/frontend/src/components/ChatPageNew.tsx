@@ -16,8 +16,7 @@ import {
   ThumbsDown,
   MessageSquare,
   Clock,
-  RefreshCw,
-  ChevronDown
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserRole } from '../App';
@@ -100,8 +99,9 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [showTicketPrompt, setShowTicketPrompt] = useState(false);
   const [ticketCreated, setTicketCreated] = useState(false);
-  const [showNewMenu, setShowNewMenu] = useState(false);
   const [showTicketForm, setShowTicketForm] = useState(false);
+  const [loadingConversation, setLoadingConversation] = useState(false);
+  const [isHistoryConversation, setIsHistoryConversation] = useState(false); // 标记是否为历史对话
 
   // 工单相关
   const [ticketFormData, setTicketFormData] = useState<TicketFormData>({
@@ -204,99 +204,128 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
     scrollToBottom();
   }, [messages, aiThinking]);
 
-  // 加载历史会话列表（使用假数据）
+  // 加载历史会话列表（调用真实API）
   const loadHistoryConversations = async () => {
     try {
       setLoadingHistory(true);
 
-      // 使用假数据
-      const mockSessions: ChatSession[] = [
-        {
-          id: 'mock-1',
-          title: '如何清理主刷？',
-          messages: [],
-          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2天前
-          updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
-        },
-        {
-          id: 'mock-2',
-          title: '机器人不回充怎么办？',
-          messages: [],
-          createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5天前
-          updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
-        },
-        {
-          id: 'mock-3',
-          title: '更换边刷教程',
-          messages: [],
-          createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7天前
-          updatedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-        },
-        {
-          id: 'mock-4',
-          title: '传感器清洁方法',
-          messages: [],
-          createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), // 10天前
-          updatedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
-        }
-      ];
+      // 调用真实API获取历史会话列表
+      const conversations = await getConversations();
 
-      setChatSessions(mockSessions);
+      // 转换为组件需要的格式
+      const sessions: ChatSession[] = conversations.map(conv => ({
+        id: conv.id,
+        title: conv.title,
+        messages: [], // 列表不包含详细消息
+        createdAt: new Date(conv.updatedAt), // 使用 updatedAt 作为创建时间
+        updatedAt: new Date(conv.updatedAt)
+      }));
+
+      setChatSessions(sessions);
     } catch (error) {
       console.error('加载历史会话失败:', error);
+      // 出错时设置为空数组，避免显示假数据
+      setChatSessions([]);
     } finally {
       setLoadingHistory(false);
     }
   };
 
-  // 加载特定会话的详情（使用假数据）
+  // 加载特定会话的详情（调用真实API）
   const loadConversationDetail = async (conversationId: string) => {
+    setLoadingConversation(true);
     try {
-      // 使用假数据
-      const mockMessages: Message[] = [
-        {
-          id: `${conversationId}-0`,
-          type: 'user',
-          content: '如何清理主刷？',
-          timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-          rating: null
-        },
-        {
-          id: `${conversationId}-1`,
-          type: 'ai',
-          content: '清理主刷的步骤如下：\n\n1. 首先关闭机器人电源\n2. 将主刷从机器人底部取出\n3. 使用软刷或湿布清理主刷上的毛发和灰尘\n4. 检查主刷是否有损坏，如有损坏需要更换\n5. 清理完成后将主刷重新安装回机器人\n\n建议每周清理一次主刷，以保持机器人的清洁效果。',
-          timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 30000),
-          rating: null
-        },
-        {
-          id: `${conversationId}-2`,
-          type: 'user',
-          content: '主刷多久需要更换一次？',
-          timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 60000),
-          rating: null
-        },
-        {
-          id: `${conversationId}-3`,
-          type: 'ai',
-          content: '主刷的更换周期取决于使用频率和清洁情况。一般来说：\n\n- 正常使用情况下，主刷建议每3-6个月更换一次\n- 如果主刷出现明显磨损、变形或无法正常旋转，应立即更换\n- 定期清理可以延长主刷的使用寿命\n\n您可以在我们的官方商城或授权经销商处购买原装主刷。',
-          timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 90000),
-          rating: null
-        }
-      ];
+      // 调用真实API获取会话详情
+      const detail = await getConversationDetail(conversationId);
 
-      setMessages(mockMessages);
+      // 转换消息格式：从 API 格式转换为组件需要的格式
+      const convertedMessages: Message[] = detail.messages.map((msg, index) => ({
+        id: `${conversationId}-${index}`,
+        type: msg.role === 'user' ? 'user' : 'ai',
+        content: msg.content,
+        timestamp: new Date(msg.timestamp),
+        rating: null
+      }));
+
+      setMessages(convertedMessages);
       setCurrentSessionId(conversationId);
+      setIsHistoryConversation(true); // 标记为历史对话
     } catch (error) {
       console.error('加载会话详情失败:', error);
+      // 出错时显示错误提示
+      setMessages([
+        {
+          id: 'error',
+          type: 'ai',
+          content: '加载会话详情失败，请稍后重试。',
+          timestamp: new Date(),
+          rating: null
+        }
+      ]);
+    } finally {
+      setLoadingConversation(false);
     }
   };
 
-  // 当打开历史对话时加载列表（只有在创建过新对话后才加载）
+  // 当打开历史对话时加载列表
   useEffect(() => {
-    if (showHistoryDialog && hasCreatedNewChat) {
+    if (showHistoryDialog) {
       loadHistoryConversations();
     }
-  }, [showHistoryDialog, hasCreatedNewChat]);
+  }, [showHistoryDialog]);
+
+  // 阻止历史对话框打开时背景滚动
+  useEffect(() => {
+    if (showHistoryDialog) {
+      // 保存当前滚动位置
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      
+      return () => {
+        // 恢复滚动位置
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        window.scrollTo(0, scrollY);
+      };
+    }
+  }, [showHistoryDialog]);
+
+  // 阻止新建对话确认框打开时背景滚动
+  useEffect(() => {
+    if (showNewChatDialog) {
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      
+      return () => {
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        window.scrollTo(0, scrollY);
+      };
+    }
+  }, [showNewChatDialog]);
+
+  // 阻止工单表单打开时背景滚动
+  useEffect(() => {
+    if (showTicketForm) {
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      
+      return () => {
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        window.scrollTo(0, scrollY);
+      };
+    }
+  }, [showTicketForm]);
 
   // 处理初始消息
   useEffect(() => {
@@ -304,23 +333,6 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
       handleSendMessage(initialMessage);
     }
   }, [initialMessage]);
-
-  // 点击外部关闭下拉菜单
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (showNewMenu && !target.closest('.new-menu-container')) {
-        setShowNewMenu(false);
-      }
-    };
-
-    if (showNewMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }
-  }, [showNewMenu]);
 
   const handleSendMessage = (text: string) => {
     if (!text.trim()) return;
@@ -350,18 +362,44 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
 
     let aiMessageId = (Date.now() + 1).toString();
     let fullAnswer = '';
-    let currentConversationId = currentSessionId || undefined;
+    let conversationIdSaved = false; // 跟踪是否已保存 conversation_id，避免重复处理
+    let requestCancelled = false; // 跟踪请求是否被取消
+
+    // 构建请求参数
+    // 规则：
+    // 1. 用户发送第一条消息时，currentSessionId 为 null，不传 conversationId，后端会创建新会话
+    // 2. 用户继续追问时，currentSessionId 有值，传递 conversationId，用于多轮对话
+    const requestParams: { query: string; conversationId?: string } = {
+      query: text,
+    };
+
+    // 只有在存在会话ID时才传递，用于多轮对话
+    const isNewConversation = !currentSessionId;
+    if (currentSessionId) {
+      requestParams.conversationId = currentSessionId;
+    }
+
+    console.log('=== 准备调用 sendAIMessage ===');
+    console.log('请求参数:', requestParams);
+    console.log('当前会话ID:', currentSessionId);
+    console.log('是否新会话:', isNewConversation);
 
     // 调用真实的 AI API
-    const cancelFn = sendAIMessage(
-      {
-        query: text,
-        conversationId: currentConversationId,
-      },
+    sendAIMessage(
+      requestParams,
       // onMessage: 收到消息片段
       (event) => {
+        console.log('sendmessage');
+        if (requestCancelled) {
+          console.log('请求已取消，忽略事件');
+          return;
+        }
+
+        console.log('收到 SSE 事件:', event);
+
         if (event.event === 'message' && event.answer) {
           fullAnswer += event.answer;
+          console.log('累积回答:', fullAnswer.slice(0, 50) + '...');
 
           // 更新或添加 AI 消息
           setMessages(prev => {
@@ -375,6 +413,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
               );
             } else {
               // 添加新消息
+              console.log('添加新 AI 消息');
               return [...prev, {
                 id: aiMessageId,
                 type: 'ai' as const,
@@ -384,21 +423,19 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
               }];
             }
           });
-        }
 
-        if (event.event === 'message_end') {
-          clearInterval(stepInterval);
-          setAiThinking(false);
+          // 立即保存 conversation_id（如果存在且尚未保存），以便后续消息能继续同一会话
+          // conversation_id 可能在 message 事件中就已经返回，需要立即保存
+          if (event.conversation_id && !conversationIdSaved) {
+            conversationIdSaved = true;
+            console.log('保存 conversation_id:', event.conversation_id);
 
-          // 保存会话 ID
-          if (event.conversation_id) {
+            // 立即保存会话ID，确保用户在同一轮对话中发送多条消息时能正确关联
             setCurrentSessionId(event.conversation_id);
 
-            // 更新会话列表标题
-            if (!currentConversationId) {
-              // 新会话，标记已创建过新对话
+            // 如果是新会话，添加到历史记录列表
+            if (isNewConversation) {
               setHasCreatedNewChat(true);
-              // 新会话，添加到列表（使用假数据）
               const newSession: ChatSession = {
                 id: event.conversation_id,
                 title: text.slice(0, 20) + (text.length > 20 ? '...' : ''),
@@ -408,6 +445,47 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
               };
               setChatSessions(prev => [newSession, ...prev]);
             }
+          }
+        }
+
+        if (event.event === 'message_end') {
+          console.log('消息结束');
+          clearInterval(stepInterval);
+          setAiThinking(false);
+
+          // 确保会话 ID 已保存（如果 message 事件中没有保存，在这里保存）
+          // 有些情况下 conversation_id 可能在 message_end 事件中才返回
+          if (event.conversation_id && !conversationIdSaved) {
+            conversationIdSaved = true;
+            console.log('在 message_end 中保存 conversation_id:', event.conversation_id);
+
+            // 保存会话ID
+            setCurrentSessionId(event.conversation_id);
+
+            // 如果是新会话，添加到历史记录列表
+            if (isNewConversation) {
+              setHasCreatedNewChat(true);
+              const newSession: ChatSession = {
+                id: event.conversation_id,
+                title: text.slice(0, 20) + (text.length > 20 ? '...' : ''),
+                messages: [],
+                createdAt: new Date(),
+                updatedAt: new Date()
+              };
+              setChatSessions(prev => [newSession, ...prev]);
+            }
+          }
+
+          // 如果没有收到任何回答，显示错误提示
+          if (!fullAnswer || fullAnswer.trim() === '') {
+            console.warn('未收到 AI 回答');
+            setMessages(prev => [...prev, {
+              id: aiMessageId,
+              type: 'ai' as const,
+              content: '抱歉，我没有收到回复。请重试。',
+              timestamp: new Date(),
+              rating: null
+            }]);
           }
 
           // 如果有检索资源，可以添加引用
@@ -433,11 +511,14 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
         clearInterval(stepInterval);
         setAiThinking(false);
 
-        // 显示错误消息
+        // 显示详细的错误消息
+        const errorMessage = error.message || '未知错误';
+        console.error('错误详情:', errorMessage);
+
         setMessages(prev => [...prev, {
           id: aiMessageId,
           type: 'ai' as const,
-          content: '抱歉，我遇到了一些问题。请稍后再试。',
+          content: `抱歉，我遇到了问题：${errorMessage}\n\n请检查网络连接或稍后再试。`,
           timestamp: new Date(),
           rating: null
         }]);
@@ -449,8 +530,8 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
       }
     );
 
-    // 保存取消函数，以便需要时可以取消请求
-    // 这里可以存储到 state 或 ref 中
+    // cancelRequest 可用于取消请求，例如用户快速发送新消息或组件卸载时
+    // 当前未使用，但保留以便将来需要时使用
   };
 
   const getAIResponse = (userText: string): string => {
@@ -535,8 +616,11 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
         timestamp: new Date()
       }
     ]);
-    setCurrentSessionId(null); // 重置会话ID
+    // 重置会话ID，下次发送消息时将创建新会话
+    setCurrentSessionId(null);
     setTicketCreated(false);
+    setShowTicketPrompt(false); // 重置工单提示关闭状态
+    setIsHistoryConversation(false); // 重置为非历史对话
     setShowNewChatDialog(false);
     setHasCreatedNewChat(true); // 标记已创建过新对话
   };
@@ -689,54 +773,27 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
           >
             <History className="w-5 h-5 text-gray-600" />
           </button>
-          <div className="relative new-menu-container">
-            <button
-              onClick={() => setShowNewMenu(!showNewMenu)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors haptic-feedback flex items-center gap-1"
-            >
-              <Plus className="w-5 h-5 text-gray-600" />
-              <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${showNewMenu ? 'rotate-180' : ''}`} />
-            </button>
-
-            {/* 下拉菜单 */}
-            <AnimatePresence>
-              {showNewMenu && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                  className="absolute top-full mt-2 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden z-50"
-                  style={{ right: 0, width: '80px', minWidth: '80px' }}
-                >
-                  <button
-                    onClick={() => {
-                      setShowNewMenu(false);
-                      handleNewChat();
-                    }}
-                    className="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors haptic-feedback whitespace-nowrap"
-                  >
-                    新建对话
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowNewMenu(false);
-                      handleOpenTicketDialog();
-                    }}
-                    className="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors haptic-feedback border-t border-gray-100 whitespace-nowrap"
-                  >
-                    新建工单
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          <button
+            onClick={handleNewChat}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors haptic-feedback"
+          >
+            <Plus className="w-5 h-5 text-gray-600" />
+          </button>
         </div>
       </div>
 
       {/* 对话区域 */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {messages.length === 0 ? (
+      <div className="flex-1 overflow-y-auto px-4 py-4 pb-2 space-y-4">
+        {loadingConversation ? (
+          /* 加载历史对话的加载动画 */
+          <div className="h-full flex flex-col items-center justify-center">
+            <div className="relative">
+              <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+              <Loader className="w-8 h-8 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+            </div>
+            <p className="mt-4 text-sm text-gray-600">加载对话记录中...</p>
+          </div>
+        ) : messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-8">
             <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mb-4">
               <AlertCircle className="w-12 h-12 text-blue-600" />
@@ -895,15 +952,24 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 问题解决提示区 */}
-      {messages.length > 3 && !aiThinking && !ticketCreated && (
+      {/* 问题解决提示区 - 只在非历史对话且未关闭时显示 */}
+      {messages.length > 3 && !aiThinking && !ticketCreated && !isHistoryConversation && !showTicketPrompt && (
         <div className="px-4 pb-3">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-4"
+            className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-4 relative"
           >
-            <div className="flex items-start gap-3">
+            {/* 关闭按钮 */}
+            <button
+              onClick={() => setShowTicketPrompt(true)}
+              className="absolute top-3 right-3 p-1 hover:bg-white/50 rounded-lg transition-colors"
+              aria-label="关闭提示"
+            >
+              <X className="w-4 h-4 text-gray-500" />
+            </button>
+
+            <div className="flex items-start gap-3 pr-8">
               <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h4 className="font-semibold text-gray-900 mb-1">问题解决了吗？</h4>
@@ -1014,14 +1080,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
               </div>
 
               <div className="max-h-[60vh] overflow-y-auto px-4 py-4">
-                {!hasCreatedNewChat ? (
-                  <div className="text-center py-12">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <MessageSquare className="w-8 h-8 text-gray-400" />
-                    </div>
-                    <p className="text-sm text-gray-500">创建新对话后，历史记录将显示在这里</p>
-                  </div>
-                ) : loadingHistory ? (
+                {loadingHistory ? (
                   <div className="text-center py-12">
                     <Loader className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-4" />
                     <p className="text-sm text-gray-500">加载历史对话...</p>
@@ -1112,7 +1171,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
       </AnimatePresence>
 
       {/* 输入区域 */}
-      <div className="bg-white border-t border-gray-200 px-4 py-3 safe-area-bottom">
+      <div className="bg-white border-t border-gray-200 px-4 py-3 pb-safe">
         {isRecording && (
           <div className="mb-3 flex items-center justify-center gap-3 py-2">
             <div className="flex gap-1">
