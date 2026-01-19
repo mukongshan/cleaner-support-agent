@@ -24,14 +24,15 @@ import {
   Loader
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  getTickets, 
-  createTicket, 
-  TicketListItem, 
+import {
+  getTickets,
+  createTicket,
+  TicketListItem,
   TicketStatus as APITicketStatus,
   TicketPriority,
-  uploadMedia 
+  uploadMedia
 } from '../services/api';
+import { TicketForm, TicketFormData } from './TicketForm';
 
 export type TicketStatus = 'pending' | 'processing' | 'completed' | 'cancelled';
 
@@ -55,16 +56,6 @@ interface TicketsPageProps {
   onGoToChat?: () => void;
 }
 
-interface TicketFormData {
-  problemType: string;
-  priority: 'low' | 'medium' | 'high';
-  problemSummary: string;
-  deviceModel: string;
-  deviceSN: string;
-  additionalNotes: string;
-  images: string[];
-}
-
 export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: TicketsPageProps) {
   const [selectedFilter, setSelectedFilter] = useState<'all' | TicketStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -80,7 +71,7 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
     additionalNotes: '',
     images: []
   });
-  
+
   // 真实数据状态
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
@@ -96,12 +87,12 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
     try {
       setLoading(true);
       setError(null);
-      
-      const filterStatus: APITicketStatus | undefined = 
+
+      const filterStatus: APITicketStatus | undefined =
         selectedFilter === 'all' ? undefined : selectedFilter as APITicketStatus;
-      
+
       const apiTickets = await getTickets(filterStatus);
-      
+
       // 转换 API 数据为组件需要的格式
       const convertedTickets: Ticket[] = apiTickets.map(item => ({
         id: item.ticketId,
@@ -116,7 +107,7 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
         estimatedTime: item.estimatedTime,
         hasImage: false
       }));
-      
+
       setTickets(convertedTickets);
     } catch (err: any) {
       console.error('加载工单失败:', err);
@@ -301,7 +292,7 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
       });
 
       console.log('工单创建成功:', result);
-      
+
       // 重置表单
       setTicketFormData({
         problemType: 'maintenance',
@@ -312,12 +303,12 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
         additionalNotes: '',
         images: []
       });
-      
+
       setShowTicketForm(false);
-      
+
       // 重新加载工单列表
       await loadTickets();
-      
+
       if (onCreateTicket) {
         onCreateTicket();
       }
@@ -599,13 +590,13 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
         )}
       </div>
 
-      {/* 底部提示 */}
+      {/* 底部提示
       <div className="bg-white border-t border-gray-100 px-4 py-3 safe-area-bottom">
         <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
           <AlertCircle className="w-4 h-4" />
           <span>工单平均响应时间: 2小时内</span>
         </div>
-      </div>
+      </div> */}
 
       {/* 创建工单提示对话框 */}
       <AnimatePresence>
@@ -672,186 +663,17 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
         )}
       </AnimatePresence>
 
-      {/* 创建工单表单对话框 */}
+      {/* 创建工单表单 - 使用统一的 TicketForm 组件 */}
       <AnimatePresence>
         {showTicketForm && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-end justify-center z-50"
-            onClick={() => setShowTicketForm(false)}
-          >
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25 }}
-              className="bg-white w-full max-w-md rounded-t-3xl overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">创建服务工单</h3>
-                <button
-                  onClick={() => setShowTicketForm(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <X className="w-5 h-5 text-gray-500" />
-                </button>
-              </div>
-
-              <div className="max-h-[70vh] overflow-y-auto px-6 py-4">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      问题类型
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { value: 'malfunction', label: '设备故障' },
-                        { value: 'maintenance', label: '维护保养' },
-                        { value: 'consultation', label: '使用咨询' },
-                        { value: 'parts', label: '配件需求' }
-                      ].map((type) => (
-                        <button
-                          key={type.value}
-                          onClick={() =>
-                            setTicketFormData({ ...ticketFormData, problemType: type.value })
-                          }
-                          className={`px-3 py-2 border rounded-lg text-sm transition-all ${ticketFormData.problemType === type.value
-                            ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium'
-                            : 'border-gray-200 hover:border-gray-300'
-                            }`}
-                        >
-                          {type.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      优先级
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { value: 'low' as const, label: '低', color: 'gray' },
-                        { value: 'medium' as const, label: '中', color: 'blue' },
-                        { value: 'high' as const, label: '高', color: 'red' }
-                      ].map((priority) => (
-                        <button
-                          key={priority.value}
-                          onClick={() =>
-                            setTicketFormData({ ...ticketFormData, priority: priority.value })
-                          }
-                          className={`px-3 py-2 border rounded-lg text-sm transition-all ${ticketFormData.priority === priority.value
-                            ? `border-${priority.color}-500 bg-${priority.color}-50 text-${priority.color}-700 font-medium`
-                            : 'border-gray-200 hover:border-gray-300'
-                            }`}
-                        >
-                          {priority.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      问题摘要
-                    </label>
-                    <input
-                      type="text"
-                      value={ticketFormData.problemSummary}
-                      onChange={(e) =>
-                        setTicketFormData({ ...ticketFormData, problemSummary: e.target.value })
-                      }
-                      placeholder="简要描述问题..."
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        设备型号
-                      </label>
-                      <input
-                        type="text"
-                        value={ticketFormData.deviceModel}
-                        onChange={(e) =>
-                          setTicketFormData({ ...ticketFormData, deviceModel: e.target.value })
-                        }
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        设备 SN 码
-                      </label>
-                      <input
-                        type="text"
-                        value={ticketFormData.deviceSN}
-                        onChange={(e) =>
-                          setTicketFormData({ ...ticketFormData, deviceSN: e.target.value })
-                        }
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      补充说明（选填）
-                    </label>
-                    <textarea
-                      value={ticketFormData.additionalNotes}
-                      onChange={(e) =>
-                        setTicketFormData({ ...ticketFormData, additionalNotes: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none"
-                      rows={3}
-                      placeholder="补充其他信息..."
-                    />
-                  </div>
-
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                      <div className="text-xs text-blue-800">
-                        <p className="font-medium mb-1">提交后将包含：</p>
-                        <ul className="space-y-0.5">
-                          <li>• 问题详细描述</li>
-                          <li>• 设备信息和故障时间</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-                {error && (
-                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
-                    {error}
-                  </div>
-                )}
-                <button
-                  onClick={handleSubmitTicket}
-                  disabled={submitting}
-                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl haptic-feedback disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader className="w-5 h-5 animate-spin" />
-                      <span>创建中...</span>
-                    </>
-                  ) : (
-                    <span>确认创建工单</span>
-                  )}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
+          <TicketForm
+            formData={ticketFormData}
+            onFormDataChange={setTicketFormData}
+            onSubmit={handleSubmitTicket}
+            onCancel={() => setShowTicketForm(false)}
+            submitting={submitting}
+            error={error}
+          />
         )}
       </AnimatePresence>
     </div>

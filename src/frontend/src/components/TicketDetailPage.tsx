@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   ArrowLeft,
   Clock,
@@ -12,7 +12,9 @@ import {
   Camera,
   ThumbsUp,
   ThumbsDown,
-  FileText
+  FileText,
+  Send,
+  Image as ImageIcon
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Ticket, TicketStatus } from './TicketsPage';
@@ -31,6 +33,9 @@ interface Message {
 
 export function TicketDetailPage({ ticket, onBack }: TicketDetailPageProps) {
   const [userFeedback, setUserFeedback] = useState<'like' | 'dislike' | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputText, setInputText] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const getStatusInfo = (status: TicketStatus) => {
     const statusMap = {
@@ -75,8 +80,9 @@ export function TicketDetailPage({ ticket, onBack }: TicketDetailPageProps) {
   const priorityInfo = getPriorityInfo(ticket.priority);
   const StatusIcon = statusInfo.icon;
 
-  // 模拟消息记录
-  const messages: Message[] = [
+  // 初始化消息记录
+  useEffect(() => {
+    const initialMessages: Message[] = [
     {
       id: '1',
       sender: 'user',
@@ -101,11 +107,48 @@ export function TicketDetailPage({ ticket, onBack }: TicketDetailPageProps) {
       content: '问题已解决，请确认是否满意。如有其他问题，请随时联系。',
       timestamp: ticket.updatedAt
     }] : [])
-  ];
+    ];
+    setMessages(initialMessages);
+  }, [ticket]);
 
   const handleFeedback = (type: 'like' | 'dislike') => {
     setUserFeedback(type);
     // 这里可以添加API调用来保存反馈
+  };
+
+  // 滚动到底部
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // 发送消息
+  const handleSendMessage = () => {
+    if (!inputText.trim()) return;
+
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      sender: 'user',
+      content: inputText,
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, newMessage]);
+    setInputText('');
+
+    // 模拟工程师回复
+    setTimeout(() => {
+      const engineerReply: Message = {
+        id: (Date.now() + 1).toString(),
+        sender: 'engineer',
+        content: '收到您的消息，我们会尽快为您处理。',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, engineerReply]);
+    }, 1500);
   };
 
   return (
@@ -193,37 +236,48 @@ export function TicketDetailPage({ ticket, onBack }: TicketDetailPageProps) {
         </div>
 
         {/* 沟通记录 */}
-        <div className="bg-white mx-4 mt-3 rounded-xl p-4 shadow-sm">
-          <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-gray-400" />
-            沟通记录
-          </h4>
-          <div className="space-y-3">
+        <div className="bg-white mx-4 mt-3 rounded-xl shadow-sm">
+          <div className="px-4 pt-4 pb-2">
+            <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-gray-400" />
+              沟通记录
+            </h4>
+          </div>
+          <div className="px-4 pb-4 space-y-3 max-h-96 overflow-y-auto">
             {messages.map((message) => (
-              <div
+              <motion.div
                 key={message.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
                 className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[80%] rounded-xl p-3 ${
+                  className={`max-w-[80%] rounded-2xl p-3 ${
                     message.sender === 'user'
-                      ? 'bg-blue-500 text-white'
+                      ? 'bg-blue-600 text-white rounded-tr-sm'
                       : message.sender === 'engineer'
-                      ? 'bg-gray-100 text-gray-900'
+                      ? 'bg-gray-100 text-gray-900 rounded-tl-sm'
                       : 'bg-yellow-50 text-yellow-800'
                   }`}
                 >
-                  <p className="text-sm leading-relaxed">{message.content}</p>
+                  {message.sender === 'engineer' && (
+                    <div className="flex items-center gap-2 mb-1">
+                      <UserIcon className="w-3 h-3" />
+                      <span className="text-xs font-medium">{ticket.assignedTo || '工程师'}</span>
+                    </div>
+                  )}
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
                   <p
                     className={`text-xs mt-1 ${
                       message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
                     }`}
                   >
-                    {message.timestamp.toLocaleString('zh-CN')}
+                    {message.timestamp.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
-              </div>
+              </motion.div>
             ))}
+            <div ref={messagesEndRef} />
           </div>
         </div>
 
@@ -263,23 +317,45 @@ export function TicketDetailPage({ ticket, onBack }: TicketDetailPageProps) {
           </div>
         )}
 
-        {/* 快捷操作 */}
-        {ticket.status === 'processing' && (
-          <div className="bg-white mx-4 mt-3 mb-4 rounded-xl p-4 shadow-sm">
-            <h4 className="font-semibold text-gray-900 mb-3">快捷操作</h4>
-            <div className="flex gap-3">
-              <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors haptic-feedback">
-                <MessageSquare className="w-5 h-5" />
-                <span className="font-medium">发送消息</span>
-              </button>
-              <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-50 text-green-600 rounded-xl hover:bg-green-100 transition-colors haptic-feedback">
-                <Phone className="w-5 h-5" />
-                <span className="font-medium">致电工程师</span>
-              </button>
-            </div>
-          </div>
-        )}
+        <div className="h-4"></div>
       </div>
+
+      {/* 消息输入区域 */}
+      {ticket.status !== 'completed' && ticket.status !== 'cancelled' && (
+        <div className="bg-white border-t border-gray-200 px-4 py-3 safe-area-bottom">
+          <div className="flex items-end gap-2">
+            <button
+              className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors haptic-feedback flex-shrink-0"
+            >
+              <ImageIcon className="w-5 h-5 text-gray-600" />
+            </button>
+
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                placeholder="输入消息与工程师沟通..."
+                className="w-full px-4 py-2.5 bg-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              />
+            </div>
+
+            {inputText.trim() ? (
+              <button
+                onClick={handleSendMessage}
+                className="p-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors haptic-feedback flex-shrink-0"
+              >
+                <Send className="w-5 h-5 text-white" />
+              </button>
+            ) : (
+              <button className="p-2.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors haptic-feedback flex-shrink-0">
+                <Phone className="w-5 h-5" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
