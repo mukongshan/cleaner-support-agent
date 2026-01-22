@@ -3,6 +3,7 @@ package org.backend.cleanersupportagentbackend.controller.app;
 import org.backend.cleanersupportagentbackend.annotation.CurrentUserId;
 import org.backend.cleanersupportagentbackend.controller.ApiResponse;
 import org.backend.cleanersupportagentbackend.dto.ChatRequest;
+import org.backend.cleanersupportagentbackend.dto.ChatWithImageRequest;
 import org.backend.cleanersupportagentbackend.dto.ConversationDetailResponse;
 import org.backend.cleanersupportagentbackend.dto.ConversationSummaryResponse;
 import org.backend.cleanersupportagentbackend.service.AiService;
@@ -48,5 +49,13 @@ public class AiController {
         } catch (Exception e) {
             return ResponseEntity.ok(ApiResponse.error(500, e.getMessage()));
         }
+    }
+
+    /**
+     * 基于图片识别结果进行AI对话
+     */
+    @PostMapping(value = "/chat/with-image", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter chatWithImage(@CurrentUserId String userId, @RequestBody ChatWithImageRequest request) {
+        return aiService.chatWithImage(userId, request);
     }
 }

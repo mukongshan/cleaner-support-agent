@@ -29,9 +29,10 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addInterceptor(authInterceptor)
                 .addPathPatterns("/api/**")  // 拦截所有/api开头的路径
                 .excludePathPatterns(
-                        "/api/cleaner-support/v2/users/login",  // 登录接口
-                        "/api/cleaner-support/v2/media/files",   // 媒体文件列表（公开）
-                        "/api/cleaner-support/v2/media/files/**" // 媒体文件详情（公开）
+                        "/api/cleaner-support/v2/users/login",     // 登录接口
+                        "/api/cleaner-support/v2/users/register",  // 注册接口
+                        "/api/cleaner-support/v2/media/files",     // 媒体文件列表（公开）
+                        "/api/cleaner-support/v2/media/files/**"    // 媒体文件详情（公开）
                         // 注意：/api/cleaner-support/v2/media/upload 需要登录验证
                 );
     }

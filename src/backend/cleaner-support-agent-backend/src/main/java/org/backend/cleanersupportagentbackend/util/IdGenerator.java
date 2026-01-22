@@ -43,4 +43,13 @@ public class IdGenerator {
     public static String generateFileId() {
         return "KB" + UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
     }
+
+    /**
+     * 生成图片识别ID：IMG + 日期(8位) + 序号(3位)
+     */
+    public static String generateRecognitionId() {
+        String date = LocalDateTime.now().format(DATE_FORMATTER);
+        String sequence = String.format("%03d", (int)(Math.random() * 1000));
+        return "IMG" + date + sequence;
+    }
 }

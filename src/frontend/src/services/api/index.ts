@@ -16,3 +16,6 @@ export * from './ticket';
 
 // 媒体文件
 export * from './media';
+
+// 图片识别
+export * from './imageRecognition';
