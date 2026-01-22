@@ -33,6 +33,7 @@ import {
   uploadMedia
 } from '../services/api';
 import { TicketForm, TicketFormData } from './TicketForm';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export type TicketStatus = 'pending' | 'processing' | 'completed' | 'cancelled';
 
@@ -57,6 +58,7 @@ interface TicketsPageProps {
 }
 
 export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: TicketsPageProps) {
+  const { t } = useLanguage();
   const [selectedFilter, setSelectedFilter] = useState<'all' | TicketStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [ticketFeedbacks, setTicketFeedbacks] = useState<Record<string, 'like' | 'dislike' | null>>({});
@@ -182,19 +184,19 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
   const getStatusInfo = (status: TicketStatus) => {
     const statusMap = {
       pending: {
-        label: '待处理',
+        label: t('pending'),
         color: 'text-yellow-600 bg-yellow-50',
         icon: Clock,
         borderColor: 'border-yellow-200'
       },
       processing: {
-        label: '处理中',
+        label: t('processing'),
         color: 'text-blue-600 bg-blue-50',
         icon: AlertCircle,
         borderColor: 'border-blue-200'
       },
       completed: {
-        label: '已完成',
+        label: t('completed'),
         color: 'text-green-600 bg-green-50',
         icon: CheckCircle,
         borderColor: 'border-green-200'
@@ -321,14 +323,20 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col bg-transparent">
       {/* 顶部 */}
-      <div className="bg-white px-4 py-4 shadow-sm">
+      <div
+        className="px-4 py-4 relative z-10"
+        style={{
+          backdropFilter: 'blur(12px)',
+          backgroundColor: 'rgba(255, 255, 255, 0.1)'
+        }}
+      >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">我的工单</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t('my_tickets')}</h2>
           <button
             onClick={handleCreateTicketClick}
-            className="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors shadow-sm haptic-feedback"
+            className="p-2 text-gray-900 hover:bg-gray-100 rounded-lg transition-colors haptic-feedback"
           >
             <Plus className="w-5 h-5" />
           </button>
@@ -341,7 +349,7 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="搜索工单编号或问题描述..."
+            placeholder={t('search_ticket_placeholder')}
             className="w-full pl-10 pr-4 py-2.5 bg-gray-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
           />
         </div>
@@ -350,15 +358,15 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
         <div className="grid grid-cols-3 gap-3 mb-4">
           <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 text-center">
             <div className="text-2xl font-bold text-blue-600">{statusCounts.all}</div>
-            <div className="text-xs text-blue-700 mt-1">全部工单</div>
+            <div className="text-xs text-blue-700 mt-1">{t('all_tickets')}</div>
           </div>
           <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-3 text-center">
             <div className="text-2xl font-bold text-yellow-600">{statusCounts.processing}</div>
-            <div className="text-xs text-yellow-700 mt-1">处理中</div>
+            <div className="text-xs text-yellow-700 mt-1">{t('processing')}</div>
           </div>
           <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-3 text-center">
             <div className="text-2xl font-bold text-green-600">{statusCounts.completed}</div>
-            <div className="text-xs text-green-700 mt-1">已完成</div>
+            <div className="text-xs text-green-700 mt-1">{t('completed')}</div>
           </div>
         </div>
 
@@ -371,7 +379,7 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
               : 'bg-gray-100 text-gray-600'
               }`}
           >
-            全部 ({statusCounts.all})
+            {t('all')} ({statusCounts.all})
           </button>
           <button
             onClick={() => setSelectedFilter('pending')}
@@ -380,7 +388,7 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
               : 'bg-gray-100 text-gray-600'
               }`}
           >
-            待处理 ({statusCounts.pending})
+            {t('pending')} ({statusCounts.pending})
           </button>
           <button
             onClick={() => setSelectedFilter('processing')}
@@ -389,7 +397,7 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
               : 'bg-gray-100 text-gray-600'
               }`}
           >
-            处理中 ({statusCounts.processing})
+            {t('processing')} ({statusCounts.processing})
           </button>
           <button
             onClick={() => setSelectedFilter('completed')}
@@ -398,13 +406,13 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
               : 'bg-gray-100 text-gray-600'
               }`}
           >
-            已完成 ({statusCounts.completed})
+            {t('completed')} ({statusCounts.completed})
           </button>
         </div>
       </div>
 
       {/* 工单列表 */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div className="flex-1 overflow-y-auto px-4 py-4 relative z-0">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full">
             <Loader className="w-12 h-12 text-blue-600 animate-spin mb-4" />
@@ -464,7 +472,12 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  className={`w-full bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all border-l-4 ${statusInfo.borderColor}`}
+                  className={`w-full rounded-xl p-4 transition-all border-l-4 ${statusInfo.borderColor}`}
+                  style={{
+                    backdropFilter: 'blur(8px)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                  }}
                 >
                   <button
                     onClick={handleCardClick}
@@ -591,7 +604,13 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
       </div>
 
       {/* 底部提示
-      <div className="bg-white border-t border-gray-100 px-4 py-3 safe-area-bottom">
+      <div 
+        className="px-4 py-3 safe-area-bottom"
+        style={{
+          backdropFilter: 'blur(12px)',
+          backgroundColor: 'rgba(255, 255, 255, 0.1)'
+        }}
+      >
         <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
           <AlertCircle className="w-4 h-4" />
           <span>工单平均响应时间: 2小时内</span>

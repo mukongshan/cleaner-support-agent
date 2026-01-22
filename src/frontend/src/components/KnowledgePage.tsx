@@ -201,9 +201,15 @@ export function KnowledgePage() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col bg-transparent">
       {/* 顶部搜索栏 */}
-      <div className="bg-white px-4 py-4 shadow-sm">
+      <div 
+        className="px-4 py-4 relative z-10"
+        style={{
+          backdropFilter: 'blur(12px)',
+          backgroundColor: 'rgba(255, 255, 255, 0.1)'
+        }}
+      >
         <h2 className="text-lg font-semibold text-gray-900 mb-3">知识库中心</h2>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -218,7 +224,13 @@ export function KnowledgePage() {
       </div>
 
       {/* 分类标签 */}
-      <div className="bg-white px-4 py-3 border-b border-gray-100 overflow-x-auto">
+      <div 
+        className="px-4 py-3 overflow-x-auto relative z-10"
+        style={{
+          backdropFilter: 'blur(12px)',
+          backgroundColor: 'rgba(255, 255, 255, 0.1)'
+        }}
+      >
         <div className="flex gap-2 min-w-max">
           {categories.map((category) => {
             const Icon = category.icon;
@@ -241,7 +253,7 @@ export function KnowledgePage() {
       </div>
 
       {/* 内容列表 */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div className="flex-1 overflow-y-auto px-4 py-4 relative z-0">
         {filteredData.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-8">
             <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
@@ -260,7 +272,12 @@ export function KnowledgePage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="w-full bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all text-left haptic-feedback"
+                className="w-full rounded-xl p-4 text-left haptic-feedback"
+                style={{
+                  backdropFilter: 'blur(8px)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                }}
               >
                 <div className="flex gap-3">
                   {/* 图标 */}

@@ -30,6 +30,8 @@ import {
 } from '../services/api';
 import { getToken } from '../services/api/config';
 import { TicketForm } from './TicketForm';
+import aiAvatar from '../assets/images/ai_avatar.png';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface Message {
   id: string;
@@ -77,6 +79,7 @@ interface AIExtractedInfo {
 }
 
 export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageProps) {
+  const { t, language } = useLanguage();
   // 聊天会话管理
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -87,7 +90,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
     {
       id: '1',
       type: 'ai',
-      content: '你好！我是您的智能助手。有什么我可以帮助您的吗？',
+      content: language === 'zh' ? '你好！我是您的智能助手。有什么我可以帮助您的吗？' : 'Hello! I am your AI assistant. How can I help you?',
       timestamp: new Date(Date.now() - 60000)
     }
   ]);
@@ -122,14 +125,17 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
   // 继续问我相关问题状态
   const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
   const [currentMessageId, setCurrentMessageId] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const prevMessagesLength = useRef(0);
 
   const thinkingSteps = [
-    '正在识别故障码...',
-    '正在查询维修知识库...',
-    '正在生成解决方案...'
+    t('ai_thinking'),
+    t('ai_thinking_2'),
+    t('ai_thinking_3')
   ];
 
   const suggestedQuestions = [
@@ -194,8 +200,10 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
 
   // 刷新继续问我的问题
   const refreshFollowUpQuestions = (aiContent: string) => {
+    setIsRefreshing(true);
     const newQuestions = getFollowUpQuestions(aiContent);
     setFollowUpQuestions(newQuestions);
+    setTimeout(() => setIsRefreshing(false), 600); // 动画完成后重置状态
   };
 
   const scrollToBottom = () => {
@@ -203,7 +211,12 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
   };
 
   useEffect(() => {
-    scrollToBottom();
+    // Only scroll if AI is thinking (streaming) OR if a new message was added
+    if (aiThinking || messages.length > prevMessagesLength.current) {
+      scrollToBottom();
+    }
+    // Update the ref to current length
+    prevMessagesLength.current = messages.length;
   }, [messages, aiThinking]);
 
   // 加载历史会话列表（调用真实API）
@@ -391,6 +404,10 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
     };
     setMessages(prev => [...prev, userMessage]);
     setInputText('');
+    // Reset textarea height after sending
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
 
     setAiThinking(true);
     setThinkingStep(0);
@@ -667,7 +684,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
       {
         id: Date.now().toString(),
         type: 'ai',
-        content: '你好！我是您的智能助手。有什么我可以帮助您的吗？',
+        content: language === 'zh' ? '你好！我是您的智能助手。有什么我可以帮助您的吗？' : 'Hello! I am your AI assistant. How can I help you?',
         timestamp: new Date()
       }
     ]);
@@ -817,28 +834,91 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col bg-transparent">
       {/* 顶部工具栏 */}
-      <div className="bg-white px-4 py-3 shadow-sm flex items-center justify-between">
-        <h2 className="font-semibold text-gray-900">AI 智能助手</h2>
+      <div
+        className="relative z-10 px-4 py-3 flex items-center justify-between"
+        style={{
+          backdropFilter: 'blur(12px)',
+          backgroundColor: 'rgba(255, 255, 255, 0.1)'
+        }}
+      >
+        <h2 className="font-semibold text-gray-900">{t('app_name')}</h2>
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowHistoryDialog(true)}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors haptic-feedback"
+            className="p-2 hover:bg-white/20 rounded-lg transition-colors haptic-feedback"
           >
-            <History className="w-5 h-5 text-gray-600" />
+            <History className="w-5 h-5 text-gray-700" />
           </button>
           <button
             onClick={handleNewChat}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors haptic-feedback"
+            className="p-2 hover:bg-white/20 rounded-lg transition-colors haptic-feedback"
           >
-            <Plus className="w-5 h-5 text-gray-600" />
+            <Plus className="w-5 h-5 text-gray-700" />
           </button>
         </div>
       </div>
 
+      {/* 问题解决提示横幅 - QQ群待办样式 */}
+      <AnimatePresence>
+        {(() => {
+          // 检查最后一条消息是否是工单创建相关的系统消息
+          const lastMessage = messages[messages.length - 1];
+          const ticketKeywords = language === 'zh' ? ['工单', '太好了', '创建成功'] : ['ticket', 'great', 'created successfully'];
+          const isLastMessageTicketRelated = lastMessage?.content &&
+            (ticketKeywords.some(keyword => lastMessage.content.includes(keyword)) || ticketCreated);
+
+          // 显示条件：消息数>3 && AI不在思考 && 未创建工单 && 非历史对话 && 未关闭提示 && 最后一条消息不是工单相关
+          const shouldShow = messages.length > 3 &&
+            !aiThinking &&
+            !ticketCreated &&
+            !isHistoryConversation &&
+            !showTicketPrompt &&
+            !isLastMessageTicketRelated;
+
+          return shouldShow ? (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+              className="w-full py-2 px-4 bg-blue-50/90 border-b border-blue-100"
+            >
+              <div className="flex items-center justify-between">
+                {/* Left: Text */}
+                <p className="text-sm text-gray-700">
+                  {t('switch_human')}
+                </p>
+
+                {/* Right: Actions */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => {
+                      setShowTicketPrompt(true);
+                      handleOpenTicketDialog();
+                    }}
+                    className="px-3 py-1 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors haptic-feedback flex items-center gap-1"
+                  >
+                    <ClipboardList className="w-3 h-3" />
+                    {t('create_ticket')}
+                  </button>
+                  <button
+                    onClick={() => setShowTicketPrompt(true)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                    aria-label="关闭提示"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          ) : null;
+        })()}
+      </AnimatePresence>
+
       {/* 对话区域 */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 pb-2 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 py-4 pb-2 space-y-4 relative z-0">
         {loadingConversation ? (
           /* 加载历史对话的加载动画 */
           <div className="h-full flex flex-col items-center justify-center">
@@ -846,16 +926,16 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
               <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
               <Loader className="w-8 h-8 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
             </div>
-            <p className="mt-4 text-sm text-gray-600">加载对话记录中...</p>
+            <p className="mt-4 text-sm text-gray-600">{t('loading_conversation')}</p>
           </div>
         ) : messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-8">
             <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mb-4">
               <AlertCircle className="w-12 h-12 text-blue-600" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">还没有对话记录</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('no_conversations')}</h3>
             <p className="text-sm text-gray-500 mb-6">
-              试试下面的常见问题，或者直接向我提问
+              {t('no_conversations_desc')}
             </p>
           </div>
         ) : (
@@ -879,14 +959,14 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
               >
                 <div className={`max-w-[80%]`}>
                   {message.type === 'ai' && (
-                    <motion.div
+                    <motion.img
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                      className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center mb-2"
-                    >
-                      <span className="text-white text-sm font-semibold">AI</span>
-                    </motion.div>
+                      src={aiAvatar}
+                      alt="AI Avatar"
+                      className="w-8 h-8 rounded-full mb-2 object-cover"
+                    />
                   )}
 
                   <motion.div
@@ -984,18 +1064,20 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-1 text-xs text-gray-500">
                             <MessageSquare className="w-3 h-3" />
-                            <span>继续问我</span>
+                            <span>{t('continue_asking')}</span>
                           </div>
-                          <motion.button
+                          <button
                             onClick={() => refreshFollowUpQuestions(message.content)}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95, rotate: 180 }}
-                            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                             className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors haptic-feedback"
                           >
-                            <RefreshCw className="w-3 h-3" />
-                            <span>换一换</span>
-                          </motion.button>
+                            <motion.div
+                              animate={{ rotate: isRefreshing ? 360 : 0 }}
+                              transition={{ duration: 0.6, ease: 'easeInOut' }}
+                            >
+                              <RefreshCw className="w-3 h-3" />
+                            </motion.div>
+                            <span>{t('refresh_questions')}</span>
+                          </button>
                         </div>
                         <div className="space-y-2">
                           {questionsToShow.slice(0, 3).map((question, qIndex) => (
@@ -1041,14 +1123,14 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
             className="flex justify-start"
           >
             <div className="max-w-[80%]">
-              <motion.div
+              <motion.img
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center mb-2"
-              >
-                <span className="text-white text-sm font-semibold">AI</span>
-              </motion.div>
+                src={aiAvatar}
+                alt="AI Avatar"
+                className="w-8 h-8 rounded-full mb-2 object-cover"
+              />
               <motion.div
                 initial={{ scale: 0.95 }}
                 animate={{ scale: 1 }}
@@ -1095,59 +1177,6 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 问题解决提示区 - 只在非历史对话且未关闭时显示 */}
-      {messages.length > 3 && !aiThinking && !ticketCreated && !isHistoryConversation && !showTicketPrompt && (
-        <div className="px-4 pb-3">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-4 relative"
-          >
-            {/* 关闭按钮 */}
-            <button
-              onClick={() => setShowTicketPrompt(true)}
-              className="absolute top-3 right-3 p-1 hover:bg-white/50 rounded-lg transition-colors"
-              aria-label="关闭提示"
-            >
-              <X className="w-4 h-4 text-gray-500" />
-            </button>
-
-            <div className="flex items-start gap-3 pr-8">
-              <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h4 className="font-semibold text-gray-900 mb-1">问题解决了吗？</h4>
-                <p className="text-sm text-gray-600 mb-3">
-                  如果以上方案未能解决您的问题，我可以为您创建工单，由专业工程师为您提供支持。
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      setTicketCreated(true);
-                      const ticketMsg: Message = {
-                        id: Date.now().toString(),
-                        type: 'ai',
-                        content: '✅ 太好了！很高兴能帮到您。如果还有其他问题，随时可以来咨询我。',
-                        timestamp: new Date()
-                      };
-                      setMessages(prev => [...prev, ticketMsg]);
-                    }}
-                    className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600 transition-colors haptic-feedback"
-                  >
-                    已解决
-                  </button>
-                  <button
-                    onClick={handleOpenTicketDialog}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors haptic-feedback flex items-center gap-1"
-                  >
-                    <ClipboardList className="w-4 h-4" />
-                    创建工单
-                  </button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      )}
 
       {/* 新建对话确认弹窗 */}
       <AnimatePresence>
@@ -1170,9 +1199,9 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
                 <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <MessageSquare className="w-8 h-8 text-blue-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">创建新对话？</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('confirm_new_chat')}</h3>
                 <p className="text-sm text-gray-600">
-                  当前对话记录将被保存。您确定要开始新的对话吗？
+                  {t('confirm_new_chat_desc')}
                 </p>
               </div>
               <div className="flex gap-3">
@@ -1180,13 +1209,13 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
                   onClick={() => setShowNewChatDialog(false)}
                   className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors haptic-feedback"
                 >
-                  取消
+                  {t('cancel')}
                 </button>
                 <button
                   onClick={confirmNewChat}
                   className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors haptic-feedback"
                 >
-                  确认
+                  {t('confirm')}
                 </button>
               </div>
             </motion.div>
@@ -1213,7 +1242,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">历史对话</h3>
+                <h3 className="text-lg font-semibold text-gray-900">{t('history')}</h3>
                 <button
                   onClick={() => setShowHistoryDialog(false)}
                   className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -1226,14 +1255,14 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
                 {loadingHistory ? (
                   <div className="text-center py-12">
                     <Loader className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-4" />
-                    <p className="text-sm text-gray-500">加载历史对话...</p>
+                    <p className="text-sm text-gray-500">{t('loading_history')}</p>
                   </div>
                 ) : chatSessions.length === 0 ? (
                   <div className="text-center py-12">
                     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                       <MessageSquare className="w-8 h-8 text-gray-400" />
                     </div>
-                    <p className="text-sm text-gray-500">暂无历史对话记录</p>
+                    <p className="text-sm text-gray-500">{t('no_history')}</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -1304,8 +1333,8 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
                   <Check className="w-6 h-6 text-green-600" />
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-900">工单创建成功！</p>
-                  <p className="text-sm text-gray-600">我们将尽快处理您的问题</p>
+                  <p className="font-semibold text-gray-900">{t('ticket_created_success')}</p>
+                  <p className="text-sm text-gray-600">{t('ticket_created_desc')}</p>
                 </div>
               </div>
             </motion.div>
@@ -1313,8 +1342,15 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
         )}
       </AnimatePresence>
 
+
       {/* 输入区域 */}
-      <div className="bg-white border-t border-gray-200 px-4 py-3 pb-safe">
+      <div
+        className="px-4 py-3 pb-safe relative z-10"
+        style={{
+          backdropFilter: 'blur(12px)',
+          backgroundColor: 'rgba(255, 255, 255, 0.1)'
+        }}
+      >
         {isRecording && (
           <div className="mb-3 flex items-center justify-center gap-3 py-2">
             <div className="flex gap-1">
@@ -1335,9 +1371,48 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
         )}
 
         <div className="flex items-end gap-2">
+          {/* Mic Button - Far Left, Always Visible */}
+          <button
+            onClick={handleVoiceRecord}
+            className={`p-2.5 rounded-lg transition-colors haptic-feedback flex-shrink-0 ${isRecording
+              ? 'bg-red-600 hover:bg-red-700'
+              : 'bg-gray-100 hover:bg-gray-200'
+              }`}
+          >
+            <Mic className={`w-5 h-5 ${isRecording ? 'text-white' : 'text-gray-600'}`} />
+          </button>
+
+          {/* Textarea - Middle, Takes Remaining Space, Auto-Resize */}
+          <div className="flex-1 relative">
+            <textarea
+              ref={textareaRef}
+              value={inputText}
+              onChange={(e) => {
+                setInputText(e.target.value);
+                // Auto-resize textarea
+                if (textareaRef.current) {
+                  textareaRef.current.style.height = 'auto';
+                  textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  if (inputText.trim()) {
+                    handleSendMessage(inputText);
+                  }
+                }
+              }}
+              placeholder={t('input_placeholder')}
+              className="w-full px-4 py-2.5 bg-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none overflow-y-auto max-h-24"
+              rows={1}
+            />
+          </div>
+
+          {/* Image Button - Right of Input, Gray Box Style */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors haptic-feedback flex-shrink-0"
+            className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors haptic-feedback flex-shrink-0"
           >
             <ImageIcon className="w-5 h-5 text-gray-600" />
           </button>
@@ -1349,35 +1424,17 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
             className="hidden"
           />
 
-          <div className="flex-1 relative">
-            <input
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage(inputText)}
-              placeholder="描述您遇到的问题..."
-              className="w-full px-4 py-2.5 bg-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            />
-          </div>
-
-          {inputText.trim() ? (
-            <button
-              onClick={() => handleSendMessage(inputText)}
-              className="p-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors haptic-feedback flex-shrink-0"
-            >
-              <Send className="w-5 h-5 text-white" />
-            </button>
-          ) : (
-            <button
-              onClick={handleVoiceRecord}
-              className={`p-2.5 rounded-lg transition-colors haptic-feedback flex-shrink-0 ${isRecording
-                ? 'bg-red-600 hover:bg-red-700'
-                : 'bg-gray-100 hover:bg-gray-200'
-                }`}
-            >
-              <Mic className={`w-5 h-5 ${isRecording ? 'text-white' : 'text-gray-600'}`} />
-            </button>
-          )}
+          {/* Send Button - Far Right, Always Visible */}
+          <button
+            onClick={() => handleSendMessage(inputText)}
+            disabled={!inputText.trim()}
+            className={`p-2.5 rounded-lg transition-colors haptic-feedback flex-shrink-0 ${inputText.trim()
+              ? 'bg-blue-600 hover:bg-blue-700'
+              : 'bg-gray-200 cursor-not-allowed'
+              }`}
+          >
+            <Send className={`w-5 h-5 ${inputText.trim() ? 'text-white' : 'text-gray-400'}`} />
+          </button>
         </div>
       </div>
     </div>
