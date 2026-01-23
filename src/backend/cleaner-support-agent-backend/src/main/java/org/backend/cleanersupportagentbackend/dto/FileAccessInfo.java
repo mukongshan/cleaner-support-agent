@@ -5,13 +5,17 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * 文件访问信息 DTO
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class MediaFileSummaryResponse {
-    private String id;
+public class FileAccessInfo {
+    private String fileId;
     private String title;
-    private String type; // Article, Video, PDF, etc.
-    private String coverUrl;
+    private Boolean isViewable;
+    private String previewUrl;
+    private String downloadUrl;
 }

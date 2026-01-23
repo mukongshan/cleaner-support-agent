@@ -62,6 +62,7 @@ app:
     api-key: ${APP_AI_API_KEY:}
   media:
     upload-dir: ${APP_MEDIA_UPLOAD_DIR:./data/uploads}
+
   image-recognition:
     # Qwen-VL API配置
     qwen-vl:
@@ -79,6 +80,13 @@ app:
     secret: ${APP_JWT_SECRET:cleaner-support-agent-secret-key-for-jwt-token-generation-2024}
     # Token过期时间（单位：秒，默认7天）
     expiration: ${APP_JWT_EXPIRATION:604800}
+
+# Seafile 配置
+seafile:
+  server-url: ${SEAFILE_SERVER_URL:https://box.nju.edu.cn}
+  repo-token: ${SEAFILE_REPO_TOKEN:8142382146993d9f7fc328074f73b28ab644efea}
+  repo-id: ${SEAFILE_REPO_ID:9136e9de-f49e-45f6-9aff-9e3abe07a257}
+  repo-password: ${SEAFILE_REPO_PASSWORD:}
 
 ---
 spring:

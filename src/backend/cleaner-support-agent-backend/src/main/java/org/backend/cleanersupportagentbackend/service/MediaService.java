@@ -1,5 +1,6 @@
 package org.backend.cleanersupportagentbackend.service;
 
+import org.backend.cleanersupportagentbackend.dto.FileAccessInfo;
 import org.backend.cleanersupportagentbackend.dto.MediaFileDetailResponse;
 import org.backend.cleanersupportagentbackend.dto.MediaFileSummaryResponse;
 import org.backend.cleanersupportagentbackend.dto.UploadFileResponse;
@@ -23,12 +24,14 @@ import java.util.stream.Collectors;
 public class MediaService {
 
     private final MediaFileRepository mediaFileRepository;
+    private final SeafileService seafileService;
     
     @Value("${app.media.upload-dir:./data/uploads}")
     private String uploadDir;
 
-    public MediaService(MediaFileRepository mediaFileRepository) {
+    public MediaService(MediaFileRepository mediaFileRepository, SeafileService seafileService) {
         this.mediaFileRepository = mediaFileRepository;
+        this.seafileService = seafileService;
     }
 
     /**
@@ -54,11 +57,101 @@ public class MediaService {
         MediaFile file = mediaFileRepository.findByFileId(fileId)
                 .orElseThrow(() -> new RuntimeException("文件不存在"));
         
+        // 获取访问信息
+        FileAccessInfo accessInfo = getFileAccessInfo(fileId);
+        
         return MediaFileDetailResponse.builder()
                 .id(file.getFileId())
-                .content(file.getContent())
                 .mediaUrl(file.getMediaUrl())
-                .relateProducts(file.getRelateProducts())
+                .previewUrl(accessInfo.getPreviewUrl())
+                .downloadUrl(accessInfo.getDownloadUrl())
+                .isViewable(accessInfo.getIsViewable())
+                .build();
+    }
+
+    /**
+     * 获取文件下载链接
+     *
+     * @param fileId 文件业务ID
+     * @return 下载链接
+     */
+    public String getFileDownloadLink(String fileId) {
+        MediaFile file = mediaFileRepository.findByFileId(fileId)
+                .orElseThrow(() -> new RuntimeException("文件不存在"));
+
+        // 如果是 Seafile 文件，实时获取下载链接
+        if (file.getAccessMethod() == MediaFile.AccessMethod.SEAFILE &&
+            file.getSeafilePath() != null) {
+            return seafileService.getDownloadLink(file.getSeafilePath());
+        }
+
+        // 否则返回已存储的下载链接
+        return file.getDownloadUrl();
+    }
+
+    /**
+     * 获取文件预览链接
+     *
+     * @param fileId 文件业务ID
+     * @return 预览链接
+     */
+    public String getFilePreviewUrl(String fileId) {
+        MediaFile file = mediaFileRepository.findByFileId(fileId)
+                .orElseThrow(() -> new RuntimeException("文件不存在"));
+
+        // 如果是 Seafile 文件，生成预览链接
+        if (file.getAccessMethod() == MediaFile.AccessMethod.SEAFILE &&
+            file.getSeafilePath() != null) {
+            return seafileService.generatePreviewUrl(file.getSeafilePath());
+        }
+
+        // 否则返回已存储的预览链接
+        return file.getPreviewUrl();
+    }
+
+    /**
+     * 判断文件是否支持在线预览
+     *
+     * @param fileId 文件业务ID
+     * @return 是否可预览
+     */
+    public boolean isFileViewable(String fileId) {
+        MediaFile file = mediaFileRepository.findByFileId(fileId)
+                .orElseThrow(() -> new RuntimeException("文件不存在"));
+
+        if (file.getIsViewable() != null) {
+            return file.getIsViewable();
+        }
+
+        // 如果是 Seafile 文件，实时判断
+        if (file.getAccessMethod() == MediaFile.AccessMethod.SEAFILE &&
+            file.getSeafilePath() != null) {
+            return seafileService.isViewableFile(file.getSeafilePath());
+        }
+
+        return false;
+    }
+
+    /**
+     * 智能处理文件：返回预览链接或下载链接
+     *
+     * @param fileId 文件业务ID
+     * @return 访问信息（包含预览链接和下载链接）
+     */
+    public FileAccessInfo getFileAccessInfo(String fileId) {
+        MediaFile file = mediaFileRepository.findByFileId(fileId)
+                .orElseThrow(() -> new RuntimeException("文件不存在"));
+
+        boolean viewable = isFileViewable(fileId);
+        String previewUrl = viewable ? getFilePreviewUrl(fileId) : null;
+        String downloadUrl = getFileDownloadLink(fileId);
+
+        return FileAccessInfo.builder()
+                .fileId(fileId)
+                .title(file.getTitle())
+                .isViewable(viewable)
+                .previewUrl(previewUrl)
+                .downloadUrl(downloadUrl)
                 .build();
     }
 
@@ -104,10 +197,8 @@ public class MediaService {
         return MediaFileSummaryResponse.builder()
                 .id(file.getFileId())
                 .title(file.getTitle())
-                .summary(file.getSummary())
                 .type(file.getType().name())
                 .coverUrl(file.getCoverUrl())
-                .duration(file.getDuration())
                 .build();
     }
 
