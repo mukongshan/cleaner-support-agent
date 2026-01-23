@@ -16,7 +16,9 @@ import {
   ThumbsDown,
   MessageSquare,
   Clock,
-  RefreshCw
+  RefreshCw,
+  Loader2,
+  RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserRole } from '../App';
@@ -28,10 +30,12 @@ import {
   Conversation,
   ConversationDetail
 } from '../services/api';
-import { getToken } from '../services/api/config';
+import { getToken, API_BASE_URL } from '../services/api/config';
 import { TicketForm } from './TicketForm';
 import aiAvatar from '../assets/images/ai_avatar.png';
 import { useLanguage } from '../contexts/LanguageContext';
+import { uploadAndRecognizeImage, sendAIMessageWithImage, ImageRecognitionResponse } from '../services/api/imageRecognition';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 interface Message {
   id: string;
@@ -126,6 +130,20 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
   const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
   const [currentMessageId, setCurrentMessageId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // 图片识别相关状态
+  interface ImageItem {
+    id: string;
+    file: File;
+    preview: string;
+    recognitionId?: string;
+    imageUrl?: string;
+    description?: string;
+    status: 'uploading' | 'recognizing' | 'completed' | 'failed';
+    error?: string;
+    abortController?: AbortController; // 用于取消请求
+  }
+  const [uploadedImages, setUploadedImages] = useState<ImageItem[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -393,7 +411,571 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
     loadRecentConversation();
   }, []); // 只在组件挂载时执行一次
 
+  // 处理图片上传和识别（可重用的函数）
+  const processImageRecognition = async (imageId: string, file: File, signal?: AbortSignal) => {
+    const startTime = Date.now();
+    console.log('[ChatPage] [图片上传] 开始处理图片识别', {
+      imageId,
+      fileName: file.name,
+      fileSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+      fileType: file.type,
+      timestamp: new Date().toISOString()
+    });
+
+    try {
+      // 更新状态为 recognizing
+      console.log('[ChatPage] [图片上传] 更新状态为 recognizing', { imageId });
+      setUploadedImages(prev =>
+        prev.map(img =>
+          img.id === imageId
+            ? { ...img, status: 'recognizing' as const }
+            : img
+        )
+      );
+
+      // 调用上传和识别接口
+      console.log('[ChatPage] [图片上传] 调用上传和识别接口', {
+        imageId,
+        url: `${API_BASE_URL}/image-reco`,
+        hasSignal: !!signal,
+        signalAborted: signal?.aborted
+      });
+      const uploadStartTime = Date.now();
+      const result: ImageRecognitionResponse = await uploadAndRecognizeImage(file, signal);
+      const uploadDuration = Date.now() - uploadStartTime;
+
+      console.log('[ChatPage] [图片上传] 上传和识别接口调用成功', {
+        imageId,
+        duration: `${uploadDuration}ms`,
+        result: {
+          recognitionId: result.recognitionId,
+          imageUrl: result.imageUrl,
+          description: result.description?.substring(0, 50) + '...',
+          status: result.status,
+          createdAt: result.createdAt
+        }
+      });
+
+      // 检查是否被取消
+      if (signal?.aborted) {
+        console.warn('[ChatPage] [图片上传] 请求已被取消', { imageId });
+        return;
+      }
+
+      // 更新图片信息
+      const finalStatus = result.status === 'completed' ? 'completed' as const : 'failed' as const;
+      console.log('[ChatPage] [图片上传] 更新图片信息到最终状态', {
+        imageId,
+        finalStatus,
+        recognitionId: result.recognitionId
+      });
+
+      setUploadedImages(prev =>
+        prev.map(img =>
+          img.id === imageId
+            ? {
+              ...img,
+              recognitionId: result.recognitionId,
+              imageUrl: result.imageUrl,
+              description: result.description,
+              status: finalStatus,
+              error: result.status === 'failed' ? '识别失败' : undefined,
+              abortController: undefined // 清除控制器
+            }
+            : img
+        )
+      );
+
+      const totalDuration = Date.now() - startTime;
+      console.log('[ChatPage] [图片上传] 图片识别处理完成', {
+        imageId,
+        totalDuration: `${totalDuration}ms`,
+        uploadDuration: `${uploadDuration}ms`,
+        status: finalStatus
+      });
+    } catch (error: any) {
+      const errorDuration = Date.now() - startTime;
+
+      // 如果请求被取消，不更新状态
+      if (error.message === '请求已取消' || error.name === 'AbortError') {
+        console.warn('[ChatPage] [图片上传] 请求被取消，不更新状态', {
+          imageId,
+          duration: `${errorDuration}ms`,
+          errorName: error.name,
+          errorMessage: error.message
+        });
+        return;
+      }
+
+      console.error('[ChatPage] [图片上传] 图片识别失败', {
+        imageId,
+        duration: `${errorDuration}ms`,
+        error: {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        }
+      });
+
+      setUploadedImages(prev =>
+        prev.map(img =>
+          img.id === imageId
+            ? {
+              ...img,
+              status: 'failed' as const,
+              error: error.message || '图片识别失败',
+              abortController: undefined // 清除控制器
+            }
+            : img
+        )
+      );
+    }
+  };
+
+  // 处理图片选择
+  const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('[ChatPage] [图片选择] 用户选择图片', {
+      filesCount: event.target.files?.length || 0,
+      timestamp: new Date().toISOString()
+    });
+
+    const files = event.target.files;
+    if (!files || files.length === 0) {
+      console.warn('[ChatPage] [图片选择] 未选择文件');
+      return;
+    }
+
+    const file = files[0];
+    console.log('[ChatPage] [图片选择] 文件信息', {
+      fileName: file.name,
+      fileSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+      fileType: file.type,
+      lastModified: new Date(file.lastModified).toISOString()
+    });
+
+    // 验证文件类型
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      console.error('[ChatPage] [图片选择] 文件类型不支持', {
+        fileType: file.type,
+        allowedTypes
+      });
+      alert('仅支持 JPG、PNG、WEBP 格式的图片');
+      return;
+    }
+
+    // 验证文件大小（10MB）
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      console.error('[ChatPage] [图片选择] 文件大小超限', {
+        fileSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+        maxSize: `${(maxSize / 1024 / 1024).toFixed(2)}MB`
+      });
+      alert('图片大小不能超过 10MB');
+      return;
+    }
+
+    // 创建预览URL
+    const preview = URL.createObjectURL(file);
+    const imageId = Date.now().toString();
+    const abortController = new AbortController();
+
+    console.log('[ChatPage] [图片选择] 创建图片项', {
+      imageId,
+      previewUrl: preview.substring(0, 50) + '...',
+      hasAbortController: !!abortController
+    });
+
+    // 添加图片到列表（初始状态为 uploading）
+    const newImage: ImageItem = {
+      id: imageId,
+      file,
+      preview,
+      status: 'uploading',
+      abortController
+    };
+
+    console.log('[ChatPage] [图片选择] 添加到图片列表', {
+      imageId,
+      currentImagesCount: uploadedImages.length,
+      newStatus: 'uploading'
+    });
+
+    setUploadedImages(prev => {
+      const newList = [...prev, newImage];
+      console.log('[ChatPage] [图片选择] 图片列表已更新', {
+        imageId,
+        totalImages: newList.length
+      });
+      return newList;
+    });
+
+    // 开始上传和识别
+    console.log('[ChatPage] [图片选择] 开始上传和识别流程', { imageId });
+    await processImageRecognition(imageId, file, abortController.signal);
+
+    // 清空文件输入
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      console.log('[ChatPage] [图片选择] 已清空文件输入', { imageId });
+    }
+  };
+
+  // 删除图片
+  const handleRemoveImage = (imageId: string) => {
+    console.log('[ChatPage] [图片删除] 用户请求删除图片', {
+      imageId,
+      timestamp: new Date().toISOString()
+    });
+
+    setUploadedImages(prev => {
+      const image = prev.find(img => img.id === imageId);
+
+      if (!image) {
+        console.warn('[ChatPage] [图片删除] 未找到要删除的图片', { imageId });
+        return prev;
+      }
+
+      console.log('[ChatPage] [图片删除] 找到图片信息', {
+        imageId,
+        status: image.status,
+        hasAbortController: !!image.abortController,
+        hasPreview: !!image.preview,
+        recognitionId: image.recognitionId
+      });
+
+      // 中断正在进行的请求
+      if (image?.abortController) {
+        image.abortController.abort();
+        console.log('[ChatPage] [图片删除] 已中断图片识别请求', {
+          imageId,
+          signalAborted: image.abortController.signal.aborted
+        });
+      }
+
+      // 清理预览URL
+      if (image && image.preview) {
+        URL.revokeObjectURL(image.preview);
+        console.log('[ChatPage] [图片删除] 已清理预览URL', { imageId });
+      }
+
+      const newList = prev.filter(img => img.id !== imageId);
+      console.log('[ChatPage] [图片删除] 图片已从列表中移除', {
+        imageId,
+        remainingImages: newList.length,
+        previousCount: prev.length
+      });
+
+      return newList;
+    });
+  };
+
+  // 重试图片识别
+  const handleRetryImage = async (imageId: string) => {
+    console.log('[ChatPage] [图片重试] 用户请求重试图片识别', {
+      imageId,
+      timestamp: new Date().toISOString()
+    });
+
+    const image = uploadedImages.find(img => img.id === imageId);
+    if (!image) {
+      console.error('[ChatPage] [图片重试] 未找到要重试的图片', { imageId });
+      return;
+    }
+
+    console.log('[ChatPage] [图片重试] 找到图片信息', {
+      imageId,
+      previousStatus: image.status,
+      previousError: image.error,
+      fileName: image.file.name,
+      fileSize: `${(image.file.size / 1024 / 1024).toFixed(2)}MB`
+    });
+
+    // 创建新的AbortController
+    const abortController = new AbortController();
+    console.log('[ChatPage] [图片重试] 创建新的AbortController', {
+      imageId,
+      hasSignal: !!abortController.signal
+    });
+
+    // 更新状态为 uploading
+    setUploadedImages(prev => {
+      const updated = prev.map(img =>
+        img.id === imageId
+          ? {
+            ...img,
+            status: 'uploading' as const,
+            error: undefined,
+            abortController
+          }
+          : img
+      );
+      console.log('[ChatPage] [图片重试] 状态已更新为 uploading', {
+        imageId,
+        updatedStatus: updated.find(img => img.id === imageId)?.status
+      });
+      return updated;
+    });
+
+    // 重新开始上传和识别
+    console.log('[ChatPage] [图片重试] 开始重新上传和识别', { imageId });
+    await processImageRecognition(imageId, image.file, abortController.signal);
+  };
+
+  // 检查是否可以发送（有文本或已识别的图片）
+  const canSend = () => {
+    const hasText = inputText.trim().length > 0;
+    const hasCompletedImages = uploadedImages.some(img => img.status === 'completed');
+
+    // 如果有正在识别或失败的图片，不能发送
+    const hasProcessingOrFailedImages = uploadedImages.some(
+      img => img.status === 'uploading' || img.status === 'recognizing' || img.status === 'failed'
+    );
+
+    return (hasText || hasCompletedImages) && !hasProcessingOrFailedImages;
+  };
+
+  // 获取发送按钮的提示信息
+  const getSendButtonTooltip = () => {
+    const hasText = inputText.trim().length > 0;
+    const hasCompletedImages = uploadedImages.some(img => img.status === 'completed');
+    const hasProcessingImages = uploadedImages.some(
+      img => img.status === 'uploading' || img.status === 'recognizing'
+    );
+    const hasFailedImages = uploadedImages.some(img => img.status === 'failed');
+
+    if (hasProcessingImages) {
+      return '图片正在识别中，请稍候...';
+    }
+    if (hasFailedImages) {
+      return '存在识别失败的图片，请重试或删除';
+    }
+    if (!hasText && !hasCompletedImages) {
+      return '请输入消息或上传图片';
+    }
+    return '';
+  };
+
   const handleSendMessage = (text: string) => {
+    console.log('[ChatPage] [发送消息] 开始处理发送消息', {
+      text: text.substring(0, 50) + (text.length > 50 ? '...' : ''),
+      textLength: text.length,
+      uploadedImagesCount: uploadedImages.length,
+      timestamp: new Date().toISOString()
+    });
+
+    // 模式A：图文混发 - 有文本且有已识别的图片
+    // 模式B：仅发图片 - 无文本但有已识别的图片
+    const hasText = text.trim().length > 0;
+    const completedImages = uploadedImages.filter(img => img.status === 'completed');
+    const processingImages = uploadedImages.filter(img =>
+      img.status === 'uploading' || img.status === 'recognizing' || img.status === 'failed'
+    );
+
+    console.log('[ChatPage] [发送消息] 图片状态统计', {
+      totalImages: uploadedImages.length,
+      completedImages: completedImages.length,
+      processingImages: processingImages.length,
+      imageStatuses: uploadedImages.map(img => ({ id: img.id, status: img.status }))
+    });
+
+    if (!hasText && completedImages.length === 0) {
+      console.warn('[ChatPage] [发送消息] 无法发送：既没有文本也没有已识别的图片', {
+        hasText,
+        completedImagesCount: completedImages.length
+      });
+      return; // 既没有文本也没有已识别的图片，不发送
+    }
+
+    // 如果有已识别的图片，使用图片对话接口
+    if (completedImages.length > 0) {
+      console.log('[ChatPage] [发送消息] 使用图片对话模式', {
+        mode: hasText ? '图文混发' : '仅发图片',
+        completedImagesCount: completedImages.length
+      });
+
+      // 使用第一张已识别图片的 recognitionId
+      const recognitionId = completedImages[0].recognitionId;
+      if (!recognitionId) {
+        console.error('[ChatPage] [发送消息] 图片识别ID不存在', {
+          imageId: completedImages[0].id,
+          imageUrl: completedImages[0].imageUrl,
+          description: completedImages[0].description
+        });
+        return;
+      }
+
+      console.log('[ChatPage] [发送消息] 准备发送图片消息', {
+        recognitionId,
+        imageUrl: completedImages[0].imageUrl,
+        hasText,
+        query: hasText ? text : undefined,
+        conversationId: currentSessionId || undefined
+      });
+
+      // 添加用户消息（如果有文本）
+      if (hasText) {
+        const userMessage: Message = {
+          id: Date.now().toString(),
+          type: 'user',
+          content: text,
+          image: completedImages[0].imageUrl,
+          timestamp: new Date()
+        };
+        console.log('[ChatPage] [发送消息] 添加图文混发用户消息', {
+          messageId: userMessage.id,
+          contentLength: text.length,
+          hasImage: !!userMessage.image
+        });
+        setMessages(prev => [...prev, userMessage]);
+      } else {
+        // 仅发图片，添加图片消息
+        const userMessage: Message = {
+          id: Date.now().toString(),
+          type: 'user',
+          content: '[图片]',
+          image: completedImages[0].imageUrl,
+          timestamp: new Date()
+        };
+        console.log('[ChatPage] [发送消息] 添加仅图片用户消息', {
+          messageId: userMessage.id,
+          imageUrl: userMessage.image
+        });
+        setMessages(prev => [...prev, userMessage]);
+      }
+
+      // 清空输入和图片
+      console.log('[ChatPage] [发送消息] 清空输入和图片列表', {
+        clearedImagesCount: uploadedImages.length
+      });
+      setInputText('');
+      setUploadedImages([]);
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
+
+      // 调用图片对话接口
+      console.log('[ChatPage] [发送消息] 设置AI思考状态并调用图片对话接口', {
+        recognitionId,
+        query: hasText ? text : undefined
+      });
+      setAiThinking(true);
+      setThinkingStep(0);
+
+      const stepInterval = setInterval(() => {
+        setThinkingStep(prev => {
+          if (prev >= thinkingSteps.length - 1) {
+            clearInterval(stepInterval);
+            return prev;
+          }
+          return prev + 1;
+        });
+      }, 1500);
+
+      let aiMessageId = (Date.now() + 1).toString();
+      let fullAnswer = '';
+      let conversationIdSaved = false;
+
+      console.log('[ChatPage] [发送消息] 调用 sendAIMessageWithImage', {
+        aiMessageId,
+        recognitionId,
+        query: hasText ? text : undefined,
+        conversationId: currentSessionId || undefined
+      });
+
+      const cancelFunction = sendAIMessageWithImage(
+        {
+          recognitionId,
+          query: hasText ? text : undefined,
+          conversationId: currentSessionId || undefined
+        },
+        (event) => {
+          if (event.event === 'message' && event.answer) {
+            fullAnswer = event.answer;
+            console.log('[ChatPage] [发送消息] 收到AI消息片段', {
+              aiMessageId,
+              answerLength: event.answer.length,
+              fullAnswerLength: fullAnswer.length
+            });
+            setMessages(prev =>
+              prev.map(msg =>
+                msg.id === aiMessageId
+                  ? { ...msg, content: fullAnswer }
+                  : msg
+              )
+            );
+          } else if (event.event === 'message_end') {
+            console.log('[ChatPage] [发送消息] AI消息结束', {
+              aiMessageId,
+              finalAnswerLength: fullAnswer.length,
+              conversationId: event.conversation_id,
+              metadata: event.metadata
+            });
+            clearInterval(stepInterval);
+            setAiThinking(false);
+            setThinkingStep(0);
+
+            if (event.conversation_id && !conversationIdSaved) {
+              console.log('[ChatPage] [发送消息] 保存会话ID', {
+                conversationId: event.conversation_id,
+                previousSessionId: currentSessionId
+              });
+              setCurrentSessionId(event.conversation_id);
+              conversationIdSaved = true;
+            }
+
+            // 生成相关问题
+            if (fullAnswer) {
+              const questions = getFollowUpQuestions(fullAnswer);
+              console.log('[ChatPage] [发送消息] 生成相关问题', {
+                aiMessageId,
+                questionsCount: questions.length,
+                questions
+              });
+              setFollowUpQuestions(questions);
+              setCurrentMessageId(aiMessageId);
+            }
+          }
+        },
+        (error) => {
+          console.error('[ChatPage] [发送消息] 图片对话失败', {
+            aiMessageId,
+            recognitionId,
+            error: {
+              name: error.name,
+              message: error.message,
+              stack: error.stack?.substring(0, 500)
+            }
+          });
+          clearInterval(stepInterval);
+          setAiThinking(false);
+          setMessages(prev =>
+            prev.map(msg =>
+              msg.id === aiMessageId
+                ? { ...msg, content: '抱歉，处理图片时出现了错误。请稍后重试。' }
+                : msg
+            )
+          );
+        },
+        () => {
+          console.log('[ChatPage] [发送消息] 图片对话完成', { aiMessageId });
+          clearInterval(stepInterval);
+        }
+      );
+
+      // 添加AI消息占位
+      const aiMessage: Message = {
+        id: aiMessageId,
+        type: 'ai',
+        content: '',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, aiMessage]);
+
+      return;
+    }
+
+    // 原有的文本消息处理逻辑
     if (!text.trim()) return;
 
     const userMessage: Message = {
@@ -984,9 +1566,13 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
                   >
                     {message.image && (
                       <img
-                        src={message.image}
+                        src={message.image.startsWith('http') ? message.image : `${API_BASE_URL}${message.image}`}
                         alt="上传的图片"
-                        className="w-full rounded-lg mb-2"
+                        className="w-full max-w-xs rounded-lg mb-2 object-cover"
+                        onError={(e) => {
+                          console.error('[ChatPage] 图片加载失败:', message.image);
+                          e.currentTarget.style.display = 'none';
+                        }}
                       />
                     )}
                     <p className="text-sm whitespace-pre-line">{message.content}</p>
@@ -1351,90 +1937,245 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
           backgroundColor: 'rgba(255, 255, 255, 0.1)'
         }}
       >
-        {isRecording && (
-          <div className="mb-3 flex items-center justify-center gap-3 py-2">
-            <div className="flex gap-1">
-              {[...Array(5)].map((_, i) => (
-                <div
-                  key={i}
-                  className="w-1 bg-red-500 rounded-full"
+        {/* 图片缩略图区域（在输入框上方） */}
+        {uploadedImages.length > 0 && (
+          <div className="mb-3 flex gap-2 overflow-x-auto pb-2 px-1">
+            <AnimatePresence mode="popLayout">
+              {uploadedImages.map((image) => (
+                <motion.div
+                  key={image.id}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8, x: -20 }}
+                  transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                  layout
+                  className="relative flex-shrink-0 group shadow-sm hover:shadow-md transition-shadow"
                   style={{
-                    height: '20px',
-                    animation: `wave 1s ease-in-out infinite`,
-                    animationDelay: `${i * 0.1}s`
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    backgroundColor: '#1f2937', // 深灰底色
+                    border: image.status === 'failed' ? '1.5px solid #ef4444' : '1px solid #e5e7eb'
                   }}
-                />
+                >
+                  {/* 1. 底层图片预览 */}
+                  <img
+                    src={image.preview}
+                    alt="预览"
+                    className="w-full h-full object-cover"
+                    style={{
+                      filter: image.status !== 'completed' ? 'grayscale(30%)' : 'none'
+                    }}
+                  />
+
+                  {/* 2. 图片变暗遮罩 (100%可靠方案) - 只有未完成时显示 */}
+                  {image.status !== 'completed' && (
+                    <div
+                      className="absolute inset-0"
+                      style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)', zIndex: 10 }} // 60%黑色遮罩让图片变暗
+                    />
+                  )}
+
+                  {/* 3. 加载/识别状态提示 */}
+                  {(image.status === 'uploading' || image.status === 'recognizing') && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
+                      style={{ zIndex: 20 }} // 层级在暗色遮罩之上
+                    >
+                      <Loader2 className="w-5 h-5 text-white animate-spin mb-1" />
+                      <span className="text-[10px] text-white font-bold tracking-wider" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+                        {image.status === 'uploading' ? '上传中...' : '识别中...'}
+                      </span>
+                    </motion.div>
+                  )}
+
+                  {/* 4. 错误状态提示 & 重试按钮 */}
+                  {image.status === 'failed' && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="absolute inset-0 flex flex-col items-center justify-center"
+                      style={{ zIndex: 20, backgroundColor: 'rgba(127, 29, 29, 0.3)' }} // 微微偏红的遮罩
+                    >
+                      <motion.button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRetryImage(image.id);
+                        }}
+                        whileHover={{ scale: 1.1, rotate: 180 }}
+                        whileTap={{ scale: 0.9 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                        className="w-8 h-8 bg-white text-red-600 rounded-full flex items-center justify-center shadow-lg cursor-pointer"
+                        title="重新上传"
+                        style={{ pointerEvents: 'auto' }} // 确保可以点击
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                      </motion.button>
+                      <span className="text-[10px] text-white font-bold mt-1.5" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+                        上传失败
+                      </span>
+                    </motion.div>
+                  )}
+
+                  {/* 5. 识别完成标记 */}
+                  {image.status === 'completed' && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                      className="absolute bottom-1.5 left-1.5 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center shadow-md"
+                      style={{ zIndex: 20 }}
+                    >
+                      <Check className="w-3 h-3 text-white" />
+                    </motion.div>
+                  )}
+
+                  {/* 6. 删除按钮 - 纯内联样式（100%强制生效，绝不依赖 Tailwind） */}
+                  <motion.button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveImage(image.id);
+                    }}
+                    whileHover={{ scale: 1.15, backgroundColor: 'rgba(239, 68, 68, 0.9)' }}
+                    whileTap={{ scale: 0.9 }}
+                    title="删除图片"
+                    // 移除了所有 Tailwind 的定位和尺寸类名，全部写进 style
+                    className="rounded-full flex items-center justify-center transition-all duration-200 shadow-sm cursor-pointer"
+                    style={{
+                      position: 'absolute',
+                      top: '4px',
+                      right: '4px',
+                      width: '24px',
+                      height: '24px',
+                      zIndex: 999, // 顶级层级
+                      backgroundColor: 'rgba(0, 0, 0, 0.6)', // 默认底色，确保能看清
+                      border: 'none',
+                      padding: 0
+                    }}
+                  >
+                    {/* 强制指定图标大小和颜色 */}
+                    <X style={{ width: '14px', height: '14px', color: '#ffffff' }} />
+                  </motion.button>
+
+                </motion.div>
               ))}
-            </div>
-            <span className="text-sm text-red-600">正在录音...</span>
+            </AnimatePresence>
           </div>
         )}
 
-        <div className="flex items-end gap-2">
-          {/* Mic Button - Far Left, Always Visible */}
+        {/* 输入框和按钮行 */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-end',
+            gap: '8px'
+          }}
+        >
+          {/* 1. 麦克风按钮 - 固定 40x40 */}
           <button
             onClick={handleVoiceRecord}
-            className={`p-2.5 rounded-lg transition-colors haptic-feedback flex-shrink-0 ${isRecording
-              ? 'bg-red-600 hover:bg-red-700'
-              : 'bg-gray-100 hover:bg-gray-200'
-              }`}
+            className="haptic-feedback flex-shrink-0"
+            style={{
+              height: '40px',
+              width: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '8px',
+              backgroundColor: isRecording ? '#dc2626' : '#f3f4f6',
+              transition: 'background-color 0.2s'
+            }}
           >
-            <Mic className={`w-5 h-5 ${isRecording ? 'text-white' : 'text-gray-600'}`} />
+            <Mic style={{ width: '20px', height: '20px', color: isRecording ? '#fff' : '#4b5563' }} />
           </button>
 
-          {/* Textarea - Middle, Takes Remaining Space, Auto-Resize */}
-          <div className="flex-1 relative">
+          {/* 2. Textarea 容器 - 通过 minHeight 锁定初始高度 */}
+          <div className="flex-1 relative" style={{ minHeight: '40px' }}>
             <textarea
               ref={textareaRef}
               value={inputText}
               onChange={(e) => {
                 setInputText(e.target.value);
-                // Auto-resize textarea
                 if (textareaRef.current) {
-                  textareaRef.current.style.height = 'auto';
-                  textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  if (inputText.trim()) {
-                    handleSendMessage(inputText);
-                  }
+                  textareaRef.current.style.height = '40px'; // 重置回单行高度
+                  textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
                 }
               }}
               placeholder={t('input_placeholder')}
-              className="w-full px-4 py-2.5 bg-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none overflow-y-auto max-h-24"
+              className="focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none overflow-y-auto"
+              style={{
+                width: '100%',
+                padding: '8px 16px',     // 上下各 8px
+                lineHeight: '24px',      // 24px + 8px*2 = 40px
+                minHeight: '40px',
+                maxHeight: '96px',
+                borderRadius: '8px',
+                backgroundColor: '#f3f4f6',
+                border: 'none',
+                display: 'block',
+                boxSizing: 'border-box'  // 极其重要：确保 padding 不增加总高度
+              }}
               rows={1}
             />
           </div>
 
-          {/* Image Button - Right of Input, Gray Box Style */}
+          {/* 3. 图片按钮 - 固定 40x40 */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors haptic-feedback flex-shrink-0"
+            className="haptic-feedback flex-shrink-0"
+            style={{
+              height: '40px',
+              width: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#f3f4f6',
+              borderRadius: '8px'
+            }}
           >
-            <ImageIcon className="w-5 h-5 text-gray-600" />
+            <ImageIcon style={{ width: '20px', height: '20px', color: '#4b5563' }} />
           </button>
+
+          {/* 隐藏的文件输入 */}
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
-            onChange={handleImageUpload}
-            className="hidden"
+            accept="image/jpeg,image/jpg,image/png,image/webp"
+            onChange={handleImageSelect}
+            style={{ display: 'none' }}
           />
 
-          {/* Send Button - Far Right, Always Visible */}
-          <button
-            onClick={() => handleSendMessage(inputText)}
-            disabled={!inputText.trim()}
-            className={`p-2.5 rounded-lg transition-colors haptic-feedback flex-shrink-0 ${inputText.trim()
-              ? 'bg-blue-600 hover:bg-blue-700'
-              : 'bg-gray-200 cursor-not-allowed'
-              }`}
-          >
-            <Send className={`w-5 h-5 ${inputText.trim() ? 'text-white' : 'text-gray-400'}`} />
-          </button>
+          {/* 4. 发送按钮 - 固定 40x40 */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => handleSendMessage(inputText)}
+                disabled={!canSend()}
+                className="haptic-feedback flex-shrink-0"
+                style={{
+                  height: '40px',
+                  width: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '8px',
+                  backgroundColor: canSend() ? '#2563eb' : '#e5e7eb',
+                  cursor: canSend() ? 'pointer' : 'not-allowed',
+                  transition: 'background-color 0.2s'
+                }}
+              >
+                <Send style={{ width: '20px', height: '20px', color: canSend() ? '#fff' : '#9ca3af' }} />
+              </button>
+            </TooltipTrigger>
+            {!canSend() && getSendButtonTooltip() && (
+              <TooltipContent side="top" className="bg-gray-900 text-white text-xs">
+                {getSendButtonTooltip()}
+              </TooltipContent>
+            )}
+          </Tooltip>
         </div>
       </div>
     </div>

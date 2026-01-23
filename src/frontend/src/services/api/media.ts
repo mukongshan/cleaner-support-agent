@@ -17,9 +17,10 @@ export type MediaCategory = 'maintenance' | 'sales' | 'company' | 'product' | 't
 
 /**
  * 媒体文件列表项
+ * 注意：id 字段就是 fileId（业务ID），格式如 KB123456，不要与数据库主键混淆
  */
 export interface MediaFile {
-  id: string;
+  id: string; // 业务ID（fileId），格式如 KB123456，用于API接口调用
   title: string;
   type: string;
   coverUrl?: string;
@@ -62,8 +63,20 @@ export async function getMediaFiles(params?: {
   category?: string;
   query?: string;
 }): Promise<MediaFile[]> {
-  const response = await get<MediaFile[]>('/media/files', params);
-  return response.data;
+  console.log('[API] getMediaFiles 请求参数:', params);
+  try {
+    const response = await get<MediaFile[]>('/media/files', params);
+    console.log('[API] getMediaFiles 响应:', {
+      code: response.code,
+      message: response.message,
+      dataLength: response.data?.length || 0,
+      data: response.data
+    });
+    return response.data || [];
+  } catch (error) {
+    console.error('[API] getMediaFiles 请求失败:', error);
+    throw error;
+  }
 }
 
 /**
@@ -78,8 +91,22 @@ export async function getMediaFileDetail(id: string): Promise<MediaFileDetail> {
  * 获取文件访问信息
  */
 export async function getFileAccessInfo(id: string): Promise<FileAccessInfo> {
-  const response = await get<FileAccessInfo>(`/media/files/${id}/access`);
-  return response.data;
+  console.log('[API] getFileAccessInfo 请求参数:', { id });
+  try {
+    const response = await get<FileAccessInfo>(`/media/files/${id}/access`);
+    console.log('[API] getFileAccessInfo 响应:', {
+      code: response.code,
+      message: response.message,
+      data: response.data
+    });
+    return response.data;
+  } catch (error) {
+    console.error('[API] getFileAccessInfo 请求失败:', {
+      error,
+      id
+    });
+    throw error;
+  }
 }
 
 /**

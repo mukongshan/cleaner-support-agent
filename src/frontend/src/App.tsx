@@ -93,7 +93,7 @@ function AppContent() {
   return (
     <div className="h-screen flex flex-col max-w-md mx-auto relative overflow-hidden">
       {/* 全局大气网格背景 */}
-      <div 
+      <div
         className="fixed inset-0 z-0"
         style={{
           backgroundColor: '#F5F7FA',
@@ -105,7 +105,7 @@ function AppContent() {
         }}
       >
         {/* 模糊光球效果 */}
-        <div 
+        <div
           className="absolute top-0 left-0 w-[400px] h-[400px] rounded-full"
           style={{
             background: 'radial-gradient(circle, rgba(59, 130, 246, 0.4) 0%, transparent 70%)',
@@ -113,7 +113,7 @@ function AppContent() {
             transform: 'translate(-20%, -20%)'
           }}
         />
-        <div 
+        <div
           className="absolute top-0 right-0 w-[400px] h-[400px] rounded-full"
           style={{
             background: 'radial-gradient(circle, rgba(147, 197, 253, 0.4) 0%, transparent 70%)',
@@ -122,11 +122,11 @@ function AppContent() {
           }}
         />
       </div>
-      
+
       {/* 主内容区 */}
       <div className="flex-1 overflow-y-auto relative z-10">
         {activeTab === 'chat' && (
-          <ChatPage 
+          <ChatPage
             initialMessage={initialChatMessage}
             onCreateTicket={handleCreateTicket}
             userRole={userRole}
@@ -136,7 +136,7 @@ function AppContent() {
           <KnowledgePage />
         )}
         {activeTab === 'tickets' && (
-          <TicketsPage 
+          <TicketsPage
             onTicketClick={handleTicketClick}
             onCreateTicket={handleCreateTicket}
             onGoToChat={() => setActiveTab('chat')}
@@ -146,7 +146,7 @@ function AppContent() {
           <TicketDetailPage ticket={selectedTicket} onBack={handleBackFromDetail} />
         )}
         {activeTab === 'profile' && (
-          <ProfilePage 
+          <ProfilePage
             userRole={userRole}
             onRoleChange={setUserRole}
             onLogout={handleLogout}
@@ -158,7 +158,7 @@ function AppContent() {
 
       {/* 登录页面 */}
       {showLogin && (
-        <LoginPage 
+        <LoginPage
           onLoginSuccess={handleLoginSuccess}
           onClose={() => setShowLogin(false)}
           onSwitchToRegister={handleSwitchToRegister}
@@ -167,7 +167,7 @@ function AppContent() {
 
       {/* 注册页面 */}
       {showRegister && (
-        <RegisterPage 
+        <RegisterPage
           onRegisterSuccess={handleRegisterSuccess}
           onClose={() => setShowRegister(false)}
           onSwitchToLogin={handleSwitchToLogin}
@@ -175,7 +175,7 @@ function AppContent() {
       )}
 
       {/* 底部导航栏 */}
-      <nav 
+      <nav
         className="safe-area-bottom relative z-10"
         style={{
           backdropFilter: 'blur(12px)',
@@ -185,9 +185,8 @@ function AppContent() {
         <div className="flex justify-around items-center h-16">
           <button
             onClick={() => setActiveTab('chat')}
-            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-              activeTab === 'chat' ? 'text-blue-600' : 'text-gray-500'
-            }`}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${activeTab === 'chat' ? 'text-blue-600' : 'text-gray-500'
+              }`}
           >
             <MessageSquare className={`w-6 h-6 mb-1 ${activeTab === 'chat' ? 'stroke-[2.5]' : ''}`} />
             <span className="text-xs">{t('tab_chat')}</span>
@@ -195,9 +194,8 @@ function AppContent() {
 
           <button
             onClick={() => setActiveTab('knowledge')}
-            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-              activeTab === 'knowledge' ? 'text-blue-600' : 'text-gray-500'
-            }`}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${activeTab === 'knowledge' ? 'text-blue-600' : 'text-gray-500'
+              }`}
           >
             <BookOpen className={`w-6 h-6 mb-1 ${activeTab === 'knowledge' ? 'stroke-[2.5]' : ''}`} />
             <span className="text-xs">{t('tab_knowledge')}</span>
@@ -205,19 +203,17 @@ function AppContent() {
 
           <button
             onClick={() => setActiveTab('tickets')}
-            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-              activeTab === 'tickets' ? 'text-blue-600' : 'text-gray-500'
-            }`}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${activeTab === 'tickets' ? 'text-blue-600' : 'text-gray-500'
+              }`}
           >
             <ClipboardList className={`w-6 h-6 mb-1 ${activeTab === 'tickets' ? 'stroke-[2.5]' : ''}`} />
             <span className="text-xs">{t('tab_ticket')}</span>
           </button>
-          
+
           <button
             onClick={() => setActiveTab('profile')}
-            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-              activeTab === 'profile' ? 'text-blue-600' : 'text-gray-500'
-            }`}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${activeTab === 'profile' ? 'text-blue-600' : 'text-gray-500'
+              }`}
           >
             <User className={`w-6 h-6 mb-1 ${activeTab === 'profile' ? 'stroke-[2.5]' : ''}`} />
             <span className="text-xs">{t('tab_profile')}</span>

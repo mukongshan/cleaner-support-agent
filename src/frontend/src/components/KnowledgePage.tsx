@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Search,
   Book,
@@ -22,6 +22,7 @@ import { Button } from './ui/button';
 export function KnowledgePage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [files, setFiles] = useState<MediaFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,55 +30,141 @@ export function KnowledgePage() {
   const [fileAccessInfo, setFileAccessInfo] = useState<FileAccessInfo | null>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [loadingAccessInfo, setLoadingAccessInfo] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitialMount = useRef(true);
 
   // 分类配置（前端分类 -> 后端分类映射）
-  const categories = [
+  const categories = useRef([
     { id: 'all', name: '全部', icon: Book, color: 'blue', backendCategory: undefined },
     { id: 'sales', name: '销售资料', icon: Book, color: 'blue', backendCategory: 'sales' },
     { id: 'maintenance', name: '维护保养', icon: Wrench, color: 'green', backendCategory: 'maintenance' },
     { id: 'product', name: '产品资料', icon: Video, color: 'purple', backendCategory: 'product' },
     { id: 'company', name: '公司介绍', icon: Book, color: 'orange', backendCategory: 'company' },
     { id: 'training', name: '培训资料', icon: Video, color: 'purple', backendCategory: 'training' }
-  ];
+  ]).current;
+
+  // 搜索防抖处理（初始加载时不防抖）
+  useEffect(() => {
+    // 初始加载时立即设置，不使用防抖
+    if (isInitialMount.current) {
+      setDebouncedSearchQuery(searchQuery);
+      isInitialMount.current = false;
+      return;
+    }
+
+    // 后续搜索时使用防抖
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery]);
 
   // 加载文件列表
   const loadFiles = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const category = categories.find(c => c.id === selectedCategory)?.backendCategory;
-      const query = searchQuery.trim() || undefined;
-      
+      const category = categories.find(c => c.id === selectedCategory)?.backendCategory ?? null;
+      const query = debouncedSearchQuery.trim() || null;
+
+      console.log('[KnowledgePage] 开始加载文件列表', {
+        selectedCategory,
+        category,
+        query,
+        debouncedSearchQuery
+      });
+
       const data = await getMediaFiles({
         category: category,
         query: query
       });
-      setFiles(data);
+
+      console.log('[KnowledgePage] 文件列表加载成功', {
+        count: data?.length || 0,
+        files: data
+      });
+
+      // 先更新列表数据
+      setFiles(data || []);
+
+      // 使用 setTimeout 确保 DOM 更新后再结束加载状态，避免闪烁
+      setTimeout(() => {
+        setLoading(false);
+      }, 0);
     } catch (err: any) {
-      setError(err.message || '加载文件列表失败');
-      console.error('加载文件列表失败:', err);
-    } finally {
-      setLoading(false);
+      const errorMessage = err.message || '加载文件列表失败';
+      console.error('[KnowledgePage] 加载文件列表失败:', {
+        error: err,
+        message: errorMessage,
+        stack: err.stack
+      });
+      setError(errorMessage);
+      // 错误时也要先更新状态再结束加载
+      setTimeout(() => {
+        setLoading(false);
+      }, 0);
     }
-  }, [selectedCategory, searchQuery]);
+  }, [selectedCategory, debouncedSearchQuery, categories]);
 
   // 初始加载和分类/搜索变化时重新加载
   useEffect(() => {
+    console.log('[KnowledgePage] useEffect 触发，准备加载文件', {
+      selectedCategory,
+      debouncedSearchQuery,
+      loading
+    });
     loadFiles();
   }, [loadFiles]);
 
+  // 组件挂载和状态变化时记录
+  useEffect(() => {
+    console.log('[KnowledgePage] 组件状态更新', {
+      selectedCategory,
+      searchQuery,
+      debouncedSearchQuery,
+      filesCount: files.length,
+      loading,
+      error,
+      hasFiles: files.length > 0
+    });
+  }, [selectedCategory, searchQuery, debouncedSearchQuery, files.length, loading, error]);
+
   // 处理文件点击
   const handleFileClick = async (file: MediaFile) => {
+    console.log('[KnowledgePage] 文件被点击', {
+      file,
+      fileId: file.id
+    });
+
     setSelectedFile(file);
     setShowDetailDialog(true);
     setLoadingAccessInfo(true);
     setFileAccessInfo(null);
-    
+
     try {
-      const accessInfo = await getFileAccessInfo(file.id);
+      // 使用 id（即 fileId，业务ID）调用访问接口
+      const fileId = file.id;
+      console.log('[KnowledgePage] 开始获取文件访问信息', { fileId });
+
+      const accessInfo = await getFileAccessInfo(fileId);
+      console.log('[KnowledgePage] 文件访问信息获取成功', { accessInfo });
+
       setFileAccessInfo(accessInfo);
     } catch (err: any) {
-      console.error('获取文件访问信息失败:', err);
+      console.error('[KnowledgePage] 获取文件访问信息失败:', {
+        error: err,
+        message: err.message,
+        fileId: file.id
+      });
     } finally {
       setLoadingAccessInfo(false);
     }
@@ -142,7 +229,7 @@ export function KnowledgePage() {
   return (
     <div className="h-full flex flex-col bg-transparent">
       {/* 顶部搜索栏 */}
-      <div 
+      <div
         className="px-4 py-4 relative z-10"
         style={{
           backdropFilter: 'blur(12px)',
@@ -163,7 +250,7 @@ export function KnowledgePage() {
       </div>
 
       {/* 分类标签 */}
-      <div 
+      <div
         className="px-4 py-3 overflow-x-auto relative z-10"
         style={{
           backdropFilter: 'blur(12px)',
@@ -178,11 +265,10 @@ export function KnowledgePage() {
               <button
                 key={category.id}
                 onClick={() => setSelectedCategory(category.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all haptic-feedback whitespace-nowrap ${
-                  isActive
-                    ? `${getCategoryColor(category.color)} shadow-sm`
-                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all haptic-feedback whitespace-nowrap ${isActive
+                  ? `${getCategoryColor(category.color)} shadow-sm`
+                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                  }`}
               >
                 <Icon className="w-4 h-4" />
                 <span className="text-sm font-medium">{category.name}</span>
@@ -255,6 +341,9 @@ export function KnowledgePage() {
                         {getTypeIcon(file.type)}
                         <span>{getTypeName(file.type)}</span>
                       </div>
+                      {file.id && (
+                        <span className="text-gray-400">• {file.id}</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -284,11 +373,24 @@ export function KnowledgePage() {
                 </div>
               ) : fileAccessInfo ? (
                 <div className="space-y-3">
+                  {/* 显示文件ID */}
+                  {selectedFile.id && (
+                    <div className="text-xs text-gray-500">
+                      文件ID: {selectedFile.id}
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     {fileAccessInfo.isViewable && (
                       <Button
                         onClick={() => {
-                          handlePreview(selectedFile.id);
+                          // 使用 id（即 fileId，业务ID）
+                          const fileId = selectedFile.id;
+                          // 如果 accessInfo 中有 previewUrl，直接使用；否则调用预览接口
+                          if (fileAccessInfo.previewUrl) {
+                            window.open(fileAccessInfo.previewUrl, '_blank');
+                          } else {
+                            handlePreview(fileId);
+                          }
                           setShowDetailDialog(false);
                         }}
                         className="flex-1"
@@ -300,7 +402,14 @@ export function KnowledgePage() {
                     )}
                     <Button
                       onClick={() => {
-                        handleDownload(selectedFile.id);
+                        // 使用 id（即 fileId，业务ID）
+                        const fileId = selectedFile.id;
+                        // 如果 accessInfo 中有 downloadUrl，直接使用；否则调用下载接口
+                        if (fileAccessInfo.downloadUrl) {
+                          window.location.href = fileAccessInfo.downloadUrl;
+                        } else {
+                          handleDownload(fileId);
+                        }
                         setShowDetailDialog(false);
                       }}
                       className="flex-1"

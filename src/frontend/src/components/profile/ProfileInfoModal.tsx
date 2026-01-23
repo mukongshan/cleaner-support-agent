@@ -80,9 +80,9 @@ export function ProfileInfoModal({
     } catch (error: any) {
       setEditError(error.message || '更新失败，请稍后重试');
       // 如果更新失败，恢复之前的昵称
-      onPersonalInfoUpdate({ 
-        ...personalInfo, 
-        nickname: userProfile?.nickname || 'kksama' 
+      onPersonalInfoUpdate({
+        ...personalInfo,
+        nickname: userProfile?.nickname || 'kksama'
       });
     } finally {
       setEditLoading(false);
@@ -141,9 +141,9 @@ export function ProfileInfoModal({
       setEditError(error.message || '上传失败，请稍后重试');
       // 如果上传失败，恢复之前的头像
       if (userProfile) {
-        onPersonalInfoUpdate({ 
-          ...personalInfo, 
-          avatar: getAvatarUrl(userProfile.avatar, userProfile.nickname) 
+        onPersonalInfoUpdate({
+          ...personalInfo,
+          avatar: getAvatarUrl(userProfile.avatar, userProfile.nickname)
         });
       }
     } finally {
@@ -167,7 +167,7 @@ export function ProfileInfoModal({
           justifyContent: 'center'
         }}
       >
-        <div 
+        <div
           style={{
             width: '100%',
             maxWidth: '28rem',
@@ -188,7 +188,7 @@ export function ProfileInfoModal({
           </div>
 
           {/* 内容 */}
-          <div 
+          <div
             style={{
               flex: 1,
               overflowY: 'auto',
@@ -208,7 +208,7 @@ export function ProfileInfoModal({
             )}
 
             {/* 信息列表 */}
-            <div 
+            <div
               className="rounded-2xl overflow-hidden"
               style={{
                 backdropFilter: 'blur(8px)',
@@ -229,7 +229,7 @@ export function ProfileInfoModal({
                 }}
                 className="hover:bg-gray-50 transition-colors haptic-feedback disabled:opacity-50"
               >
-                <div 
+                <div
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -238,7 +238,7 @@ export function ProfileInfoModal({
                   }}
                 >
                   <span className="text-sm text-gray-600 w-16">{t('avatar')}</span>
-                  <div 
+                  <div
                     style={{
                       flex: 1,
                       display: 'flex',
@@ -285,7 +285,7 @@ export function ProfileInfoModal({
                 }}
                 className="hover:bg-gray-50 transition-colors haptic-feedback"
               >
-                <div 
+                <div
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -319,7 +319,7 @@ export function ProfileInfoModal({
                 }}
                 className="hover:bg-gray-100 transition-colors haptic-feedback"
               >
-                <div 
+                <div
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -382,7 +382,7 @@ export function ProfileInfoModal({
                   <X className="w-5 h-5 text-gray-500" />
                 </button>
               </div>
-              
+
               <input
                 type="text"
                 value={editNickname}
