@@ -17,7 +17,7 @@ public interface MediaFileRepository extends JpaRepository<MediaFile, Long> {
     
     @Query("SELECT m FROM MediaFile m WHERE " +
            "(:category IS NULL OR m.category = :category) AND " +
-           "(:query IS NULL OR m.title LIKE %:query%)")
+           "(:query IS NULL OR m.title LIKE CONCAT('%', :query, '%'))")
     List<MediaFile> searchByCategoryAndQuery(@Param("category") String category, 
                                               @Param("query") String query);
 }

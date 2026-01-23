@@ -60,9 +60,12 @@ public class MediaService {
         // 获取访问信息
         FileAccessInfo accessInfo = getFileAccessInfo(fileId);
         
+        // 生成媒体URL（根据访问方式）
+        String mediaUrl = generateMediaUrl(file);
+        
         return MediaFileDetailResponse.builder()
                 .id(file.getFileId())
-                .mediaUrl(file.getMediaUrl())
+                .mediaUrl(mediaUrl)
                 .previewUrl(accessInfo.getPreviewUrl())
                 .downloadUrl(accessInfo.getDownloadUrl())
                 .isViewable(accessInfo.getIsViewable())
@@ -79,14 +82,22 @@ public class MediaService {
         MediaFile file = mediaFileRepository.findByFileId(fileId)
                 .orElseThrow(() -> new RuntimeException("文件不存在"));
 
-        // 如果是 Seafile 文件，实时获取下载链接
+        // 根据访问方式生成下载链接
         if (file.getAccessMethod() == MediaFile.AccessMethod.SEAFILE &&
             file.getSeafilePath() != null) {
+            // Seafile 文件：实时获取下载链接
             return seafileService.getDownloadLink(file.getSeafilePath());
+        } else if (file.getAccessMethod() == MediaFile.AccessMethod.LOCAL &&
+                   file.getFilePath() != null) {
+            // 本地文件：生成下载URL
+            return generateLocalFileUrl(file.getFilePath());
+        } else if (file.getAccessMethod() == MediaFile.AccessMethod.OSS &&
+                   file.getStorageKey() != null) {
+            // OSS 文件：生成下载URL（需要实现 OSS 服务）
+            return generateOssFileUrl(file.getStorageKey());
         }
 
-        // 否则返回已存储的下载链接
-        return file.getDownloadUrl();
+        return null;
     }
 
     /**
@@ -99,14 +110,22 @@ public class MediaService {
         MediaFile file = mediaFileRepository.findByFileId(fileId)
                 .orElseThrow(() -> new RuntimeException("文件不存在"));
 
-        // 如果是 Seafile 文件，生成预览链接
+        // 根据访问方式生成预览链接
         if (file.getAccessMethod() == MediaFile.AccessMethod.SEAFILE &&
             file.getSeafilePath() != null) {
+            // Seafile 文件：生成预览链接
             return seafileService.generatePreviewUrl(file.getSeafilePath());
+        } else if (file.getAccessMethod() == MediaFile.AccessMethod.LOCAL &&
+                   file.getFilePath() != null) {
+            // 本地文件：生成预览URL
+            return generateLocalFileUrl(file.getFilePath());
+        } else if (file.getAccessMethod() == MediaFile.AccessMethod.OSS &&
+                   file.getStorageKey() != null) {
+            // OSS 文件：生成预览URL（需要实现 OSS 服务）
+            return generateOssFileUrl(file.getStorageKey());
         }
 
-        // 否则返回已存储的预览链接
-        return file.getPreviewUrl();
+        return null;
     }
 
     /**
@@ -119,17 +138,51 @@ public class MediaService {
         MediaFile file = mediaFileRepository.findByFileId(fileId)
                 .orElseThrow(() -> new RuntimeException("文件不存在"));
 
+        // 如果已设置，直接返回
         if (file.getIsViewable() != null) {
             return file.getIsViewable();
         }
 
-        // 如果是 Seafile 文件，实时判断
-        if (file.getAccessMethod() == MediaFile.AccessMethod.SEAFILE &&
-            file.getSeafilePath() != null) {
-            return seafileService.isViewableFile(file.getSeafilePath());
+        // 根据文件路径判断
+        String path = getFilePath(file);
+        if (path != null) {
+            if (file.getAccessMethod() == MediaFile.AccessMethod.SEAFILE) {
+                return seafileService.isViewableFile(path);
+            } else {
+                // 本地文件和 OSS 文件：根据扩展名判断
+                return isViewableByExtension(path);
+            }
         }
 
         return false;
+    }
+    
+    /**
+     * 根据文件路径获取实际路径
+     */
+    private String getFilePath(MediaFile file) {
+        if (file.getAccessMethod() == MediaFile.AccessMethod.SEAFILE) {
+            return file.getSeafilePath();
+        } else if (file.getAccessMethod() == MediaFile.AccessMethod.LOCAL) {
+            return file.getFilePath();
+        } else if (file.getAccessMethod() == MediaFile.AccessMethod.OSS) {
+            return file.getStorageKey();
+        }
+        return null;
+    }
+    
+    /**
+     * 根据扩展名判断是否可预览
+     */
+    private boolean isViewableByExtension(String path) {
+        if (path == null) {
+            return false;
+        }
+        String lowerPath = path.toLowerCase();
+        return lowerPath.endsWith(".pdf") ||
+               lowerPath.matches(".*\\.(jpg|jpeg|png|gif|bmp|webp|svg)$") ||
+               lowerPath.matches(".*\\.(mp4|mov|avi|mkv|flv|wmv|webm|ts)$") ||
+               lowerPath.matches(".*\\.(mp3|wav|flac|aac|ogg|m4a)$");
     }
 
     /**
@@ -144,7 +197,7 @@ public class MediaService {
 
         boolean viewable = isFileViewable(fileId);
         String previewUrl = viewable ? getFilePreviewUrl(fileId) : null;
-        String downloadUrl = getFileDownloadLink(fileId);
+        String downloadUrl = !viewable ? getFileDownloadLink(fileId) : null;
 
         return FileAccessInfo.builder()
                 .fileId(fileId)
@@ -152,6 +205,7 @@ public class MediaService {
                 .isViewable(viewable)
                 .previewUrl(previewUrl)
                 .downloadUrl(downloadUrl)
+                .repoToken(seafileService.getRepoToken())
                 .build();
     }
 
@@ -200,6 +254,54 @@ public class MediaService {
                 .type(file.getType().name())
                 .coverUrl(file.getCoverUrl())
                 .build();
+    }
+
+    /**
+     * 生成媒体URL（根据访问方式）
+     */
+    private String generateMediaUrl(MediaFile file) {
+        if (file.getAccessMethod() == MediaFile.AccessMethod.SEAFILE) {
+            // Seafile 文件：返回预览链接作为媒体URL
+            return getFilePreviewUrl(file.getFileId());
+        } else if (file.getAccessMethod() == MediaFile.AccessMethod.LOCAL) {
+            // 本地文件：生成访问URL
+            return generateLocalFileUrl(file.getFilePath());
+        } else if (file.getAccessMethod() == MediaFile.AccessMethod.OSS) {
+            // OSS 文件：生成访问URL
+            return generateOssFileUrl(file.getStorageKey());
+        }
+        return null;
+    }
+    
+    /**
+     * 生成本地文件访问URL
+     */
+    private String generateLocalFileUrl(String filePath) {
+        if (filePath == null) {
+            return null;
+        }
+        // 将本地路径转换为访问URL
+        // 例如：./data/uploads/file.pdf -> /api/cleaner-support/v2/media/files/file.pdf
+        String relativePath = filePath.replace("\\", "/");
+        if (relativePath.startsWith(uploadDir)) {
+            relativePath = relativePath.substring(uploadDir.length());
+        }
+        if (relativePath.startsWith("/")) {
+            relativePath = relativePath.substring(1);
+        }
+        return "/api/cleaner-support/v2/media/files/" + relativePath;
+    }
+    
+    /**
+     * 生成OSS文件访问URL
+     */
+    private String generateOssFileUrl(String storageKey) {
+        if (storageKey == null) {
+            return null;
+        }
+        // TODO: 实现 OSS 服务，生成访问URL
+        // 示例：return ossService.generateUrl(storageKey);
+        return null;
     }
 
     private String determineFileType(String filename, String contentType) {

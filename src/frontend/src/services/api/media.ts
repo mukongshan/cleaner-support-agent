@@ -46,6 +46,17 @@ export interface FileAccessInfo {
   isViewable: boolean;
   previewUrl?: string;
   downloadUrl?: string;
+  repoToken?: string;
+}
+
+/**
+ * 文件重定向信息（包含 URL 和 repoToken）
+ */
+export interface FileRedirectInfo {
+  url: string;
+  repoToken: string;
+  title: string;
+  isPreview: boolean;
 }
 
 /**
@@ -110,17 +121,59 @@ export async function getFileAccessInfo(id: string): Promise<FileAccessInfo> {
 }
 
 /**
- * 预览文件（重定向）
+ * 预览文件（获取 URL 和 repoToken 后重定向）
  */
-export function previewFile(id: string): void {
-  window.open(`${API_BASE_URL}/media/files/${id}/preview`, '_blank');
+export async function previewFile(id: string): Promise<void> {
+  try {
+    console.log('[API] previewFile 请求参数:', { id });
+    const response = await get<FileRedirectInfo>(`/media/files/${id}/preview`);
+    console.log('[API] previewFile 响应:', {
+      code: response.code,
+      message: response.message,
+      data: response.data
+    });
+
+    if (response.code === 200 && response.data) {
+      const { url, repoToken } = response.data;
+      // 在新窗口打开预览链接
+      // 如果需要使用 repoToken 进行认证，可以在 URL 中添加参数或使用其他方式
+      window.open(url, '_blank');
+    } else {
+      console.error('[API] previewFile 失败:', response.message);
+      throw new Error(response.message || '预览失败');
+    }
+  } catch (error) {
+    console.error('[API] previewFile 请求失败:', error);
+    throw error;
+  }
 }
 
 /**
- * 下载文件（重定向）
+ * 下载文件（获取 URL 和 repoToken 后重定向）
  */
-export function downloadFile(id: string): void {
-  window.location.href = `${API_BASE_URL}/media/files/${id}/download`;
+export async function downloadFile(id: string): Promise<void> {
+  try {
+    console.log('[API] downloadFile 请求参数:', { id });
+    const response = await get<FileRedirectInfo>(`/media/files/${id}/download`);
+    console.log('[API] downloadFile 响应:', {
+      code: response.code,
+      message: response.message,
+      data: response.data
+    });
+
+    if (response.code === 200 && response.data) {
+      const { url, repoToken } = response.data;
+      // 重定向到下载链接
+      // 如果需要使用 repoToken 进行认证，可以在 URL 中添加参数或使用其他方式
+      window.location.href = url;
+    } else {
+      console.error('[API] downloadFile 失败:', response.message);
+      throw new Error(response.message || '下载失败');
+    }
+  } catch (error) {
+    console.error('[API] downloadFile 请求失败:', error);
+    throw error;
+  }
 }
 
 /**

@@ -18,4 +18,9 @@ public class FileAccessInfo {
     private Boolean isViewable;
     private String previewUrl;
     private String downloadUrl;
+    /**
+     * Seafile Repository Token
+     * 用于前端访问 Seafile 资源
+     */
+    private String repoToken;
 }

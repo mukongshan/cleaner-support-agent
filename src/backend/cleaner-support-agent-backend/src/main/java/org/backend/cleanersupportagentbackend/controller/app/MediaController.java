@@ -2,12 +2,14 @@ package org.backend.cleanersupportagentbackend.controller.app;
 
 import org.backend.cleanersupportagentbackend.controller.ApiResponse;
 import org.backend.cleanersupportagentbackend.dto.FileAccessInfo;
+import org.backend.cleanersupportagentbackend.dto.FileRedirectInfo;
 import org.backend.cleanersupportagentbackend.dto.MediaFileDetailResponse;
 import org.backend.cleanersupportagentbackend.dto.MediaFileSummaryResponse;
 import org.backend.cleanersupportagentbackend.dto.UploadFileResponse;
+import org.backend.cleanersupportagentbackend.entity.MediaFile;
+import org.backend.cleanersupportagentbackend.repository.MediaFileRepository;
 import org.backend.cleanersupportagentbackend.service.MediaService;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
+import org.backend.cleanersupportagentbackend.service.SeafileService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,9 +23,13 @@ import java.util.List;
 public class MediaController {
 
     private final MediaService mediaService;
+    private final SeafileService seafileService;
+    private final MediaFileRepository mediaFileRepository;
 
-    public MediaController(MediaService mediaService) {
+    public MediaController(MediaService mediaService, SeafileService seafileService, MediaFileRepository mediaFileRepository) {
         this.mediaService = mediaService;
+        this.seafileService = seafileService;
+        this.mediaFileRepository = mediaFileRepository;
     }
 
     @GetMapping("/files")
@@ -75,33 +81,44 @@ public class MediaController {
     }
 
     /**
-     * 获取文件下载链接（重定向到下载地址）
+     * 获取文件下载链接和 repoToken（供前端重定向）
      * GET /api/cleaner-support/v2/media/files/{id}/download
      */
     @GetMapping("/files/{id}/download")
-    public ResponseEntity<?> downloadFile(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<FileRedirectInfo>> downloadFile(@PathVariable String id) {
         try {
+            MediaFile file = mediaFileRepository.findByFileId(id)
+                    .orElseThrow(() -> new RuntimeException("文件不存在"));
+
             String downloadUrl = mediaService.getFileDownloadLink(id);
             if (downloadUrl == null) {
                 return ResponseEntity.ok(ApiResponse.error(404, "文件不存在或无法下载"));
             }
 
-            // 重定向到下载链接
-            return ResponseEntity.status(HttpStatus.FOUND)
-                    .header(HttpHeaders.LOCATION, downloadUrl)
+            // 返回下载 URL 和 repoToken，让前端重定向
+            FileRedirectInfo redirectInfo = FileRedirectInfo.builder()
+                    .url(downloadUrl)
+                    .repoToken(seafileService.getRepoToken())
+                    .title(file.getTitle())
+                    .isPreview(false)
                     .build();
+
+            return ResponseEntity.ok(ApiResponse.success(redirectInfo));
         } catch (Exception e) {
             return ResponseEntity.ok(ApiResponse.error(500, e.getMessage()));
         }
     }
 
     /**
-     * 获取文件预览链接（重定向到预览地址）
+     * 获取文件预览链接和 repoToken（供前端重定向）
      * GET /api/cleaner-support/v2/media/files/{id}/preview
      */
     @GetMapping("/files/{id}/preview")
-    public ResponseEntity<?> previewFile(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<FileRedirectInfo>> previewFile(@PathVariable String id) {
         try {
+            MediaFile file = mediaFileRepository.findByFileId(id)
+                    .orElseThrow(() -> new RuntimeException("文件不存在"));
+
             boolean viewable = mediaService.isFileViewable(id);
             if (!viewable) {
                 return ResponseEntity.ok(ApiResponse.error(400, "该文件类型不支持在线预览"));
@@ -112,10 +129,15 @@ public class MediaController {
                 return ResponseEntity.ok(ApiResponse.error(404, "文件不存在或无法预览"));
             }
 
-            // 重定向到预览链接
-            return ResponseEntity.status(HttpStatus.FOUND)
-                    .header(HttpHeaders.LOCATION, previewUrl)
+            // 返回预览 URL 和 repoToken，让前端重定向
+            FileRedirectInfo redirectInfo = FileRedirectInfo.builder()
+                    .url(previewUrl)
+                    .repoToken(seafileService.getRepoToken())
+                    .title(file.getTitle())
+                    .isPreview(true)
                     .build();
+
+            return ResponseEntity.ok(ApiResponse.success(redirectInfo));
         } catch (Exception e) {
             return ResponseEntity.ok(ApiResponse.error(500, e.getMessage()));
         }

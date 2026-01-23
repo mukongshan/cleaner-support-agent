@@ -36,29 +36,20 @@ public class MediaFile {
     private String category; // 分类，如 maintenance, sales, training
 
     @Column(length = 500)
-    private String mediaUrl; // 媒体文件URL（视频、PDF等）
+    private String coverUrl; // 封面图URL（可选，用于展示）
+
+    // 存储路径字段（根据 accessMethod 决定使用哪个）
+    @Column(length = 500)
+    private String seafilePath; // Seafile 中的文件路径（当 accessMethod = SEAFILE 时使用）
 
     @Column(length = 500)
-    private String coverUrl; // 封面图URL
+    private String filePath; // 本地文件路径（当 accessMethod = LOCAL 时使用）
 
     @Column(length = 500)
-    private String filePath; // 本地文件路径
-
-    // Seafile 相关字段
-    @Column(length = 100)
-    private String repoId; // Seafile 资料库ID
-
-    @Column(length = 500)
-    private String seafilePath; // Seafile 中的文件路径（完整路径）
-
-    @Column(length = 500)
-    private String downloadUrl; // 下载链接（临时链接，有时效性）
-
-    @Column(length = 500)
-    private String previewUrl; // 预览链接（Web预览地址）
+    private String storageKey; // 对象存储的 key（当 accessMethod = OSS 时使用）
 
     @Column
-    private Boolean isViewable; // 是否支持在线预览
+    private Boolean isViewable; // 是否支持在线预览（可根据文件类型自动判断）
 
     @Column(length = 20)
     @Enumerated(EnumType.STRING)

@@ -30,7 +30,7 @@ export function KnowledgePage() {
   const [fileAccessInfo, setFileAccessInfo] = useState<FileAccessInfo | null>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [loadingAccessInfo, setLoadingAccessInfo] = useState(false);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isInitialMount = useRef(true);
 
   // 分类配置（前端分类 -> 后端分类映射）
@@ -138,9 +138,44 @@ export function KnowledgePage() {
     });
   }, [selectedCategory, searchQuery, debouncedSearchQuery, files.length, loading, error]);
 
-  // 处理文件点击
+  // 处理文件点击 - 直接预览或下载
   const handleFileClick = async (file: MediaFile) => {
     console.log('[KnowledgePage] 文件被点击', {
+      file,
+      fileId: file.id
+    });
+
+    const fileId = file.id;
+    
+    try {
+      // 先获取文件访问信息，判断是否可预览
+      console.log('[KnowledgePage] 开始获取文件访问信息', { fileId });
+      const accessInfo = await getFileAccessInfo(fileId);
+      console.log('[KnowledgePage] 文件访问信息获取成功', { accessInfo });
+
+      // 根据是否可预览来决定是预览还是下载
+      if (accessInfo.isViewable && accessInfo.previewUrl) {
+        // 可预览，直接打开预览
+        console.log('[KnowledgePage] 文件可预览，打开预览页');
+        await previewFile(fileId);
+      } else {
+        // 不可预览，直接下载
+        console.log('[KnowledgePage] 文件不可预览，开始下载');
+        await downloadFile(fileId);
+      }
+    } catch (err: any) {
+      console.error('[KnowledgePage] 处理文件失败:', {
+        error: err,
+        message: err.message,
+        fileId: file.id
+      });
+      alert(err?.message || '打开文件失败，请稍后重试');
+    }
+  };
+
+  // 处理文件详情查看（用于长按或其他操作）
+  const handleFileDetail = async (file: MediaFile) => {
+    console.log('[KnowledgePage] 查看文件详情', {
       file,
       fileId: file.id
     });
@@ -151,7 +186,6 @@ export function KnowledgePage() {
     setFileAccessInfo(null);
 
     try {
-      // 使用 id（即 fileId，业务ID）调用访问接口
       const fileId = file.id;
       console.log('[KnowledgePage] 开始获取文件访问信息', { fileId });
 
@@ -171,13 +205,23 @@ export function KnowledgePage() {
   };
 
   // 处理预览
-  const handlePreview = (fileId: string) => {
-    previewFile(fileId);
+  const handlePreview = async (fileId: string) => {
+    try {
+      await previewFile(fileId);
+    } catch (error: any) {
+      console.error('[KnowledgePage] 预览失败:', error);
+      alert(error?.message || '预览失败，请稍后重试');
+    }
   };
 
   // 处理下载
-  const handleDownload = (fileId: string) => {
-    downloadFile(fileId);
+  const handleDownload = async (fileId: string) => {
+    try {
+      await downloadFile(fileId);
+    } catch (error: any) {
+      console.error('[KnowledgePage] 下载失败:', error);
+      alert(error?.message || '下载失败，请稍后重试');
+    }
   };
 
   const getCategoryColor = (color: string) => {
@@ -315,6 +359,10 @@ export function KnowledgePage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
                 onClick={() => handleFileClick(file)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  handleFileDetail(file);
+                }}
                 className="w-full rounded-xl p-4 text-left haptic-feedback"
                 style={{
                   backdropFilter: 'blur(8px)',
@@ -382,16 +430,12 @@ export function KnowledgePage() {
                   <div className="flex gap-2">
                     {fileAccessInfo.isViewable && (
                       <Button
-                        onClick={() => {
+                        onClick={async () => {
                           // 使用 id（即 fileId，业务ID）
                           const fileId = selectedFile.id;
-                          // 如果 accessInfo 中有 previewUrl，直接使用；否则调用预览接口
-                          if (fileAccessInfo.previewUrl) {
-                            window.open(fileAccessInfo.previewUrl, '_blank');
-                          } else {
-                            handlePreview(fileId);
-                          }
                           setShowDetailDialog(false);
+                          // 调用预览接口获取 URL 和 repoToken，然后重定向
+                          await handlePreview(fileId);
                         }}
                         className="flex-1"
                         variant="default"
@@ -401,16 +445,12 @@ export function KnowledgePage() {
                       </Button>
                     )}
                     <Button
-                      onClick={() => {
+                      onClick={async () => {
                         // 使用 id（即 fileId，业务ID）
                         const fileId = selectedFile.id;
-                        // 如果 accessInfo 中有 downloadUrl，直接使用；否则调用下载接口
-                        if (fileAccessInfo.downloadUrl) {
-                          window.location.href = fileAccessInfo.downloadUrl;
-                        } else {
-                          handleDownload(fileId);
-                        }
                         setShowDetailDialog(false);
+                        // 调用下载接口获取 URL 和 repoToken，然后重定向
+                        await handleDownload(fileId);
                       }}
                       className="flex-1"
                       variant="outline"
