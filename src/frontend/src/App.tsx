@@ -9,11 +9,13 @@ import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
 import { Home as HomeIcon, MessageSquare, User, BookOpen, ClipboardList } from 'lucide-react';
 import { getToken } from './services/api';
+import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 
 type TabType = 'home' | 'chat' | 'knowledge' | 'tickets' | 'profile' | 'ticket-detail';
 export type UserRole = 'dealer' | 'enduser';
 
-export default function App() {
+function AppContent() {
+  const { t } = useLanguage();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
@@ -89,9 +91,40 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col max-w-md mx-auto">
+    <div className="h-screen flex flex-col max-w-md mx-auto relative overflow-hidden">
+      {/* 全局大气网格背景 */}
+      <div 
+        className="fixed inset-0 z-0"
+        style={{
+          backgroundColor: '#F5F7FA',
+          background: `
+            radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.4) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(147, 197, 253, 0.4) 0%, transparent 50%),
+            #F5F7FA
+          `
+        }}
+      >
+        {/* 模糊光球效果 */}
+        <div 
+          className="absolute top-0 left-0 w-[400px] h-[400px] rounded-full"
+          style={{
+            background: 'radial-gradient(circle, rgba(59, 130, 246, 0.4) 0%, transparent 70%)',
+            filter: 'blur(100px)',
+            transform: 'translate(-20%, -20%)'
+          }}
+        />
+        <div 
+          className="absolute top-0 right-0 w-[400px] h-[400px] rounded-full"
+          style={{
+            background: 'radial-gradient(circle, rgba(147, 197, 253, 0.4) 0%, transparent 70%)',
+            filter: 'blur(100px)',
+            transform: 'translate(20%, -20%)'
+          }}
+        />
+      </div>
+      
       {/* 主内容区 */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto relative z-10">
         {activeTab === 'chat' && (
           <ChatPage 
             initialMessage={initialChatMessage}
@@ -142,7 +175,13 @@ export default function App() {
       )}
 
       {/* 底部导航栏 */}
-      <nav className="bg-white border-t border-gray-200 safe-area-bottom">
+      <nav 
+        className="safe-area-bottom relative z-10"
+        style={{
+          backdropFilter: 'blur(12px)',
+          backgroundColor: 'rgba(255, 255, 255, 0.1)'
+        }}
+      >
         <div className="flex justify-around items-center h-16">
           <button
             onClick={() => setActiveTab('chat')}
@@ -151,7 +190,7 @@ export default function App() {
             }`}
           >
             <MessageSquare className={`w-6 h-6 mb-1 ${activeTab === 'chat' ? 'stroke-[2.5]' : ''}`} />
-            <span className="text-xs">问答</span>
+            <span className="text-xs">{t('tab_chat')}</span>
           </button>
 
           <button
@@ -161,7 +200,7 @@ export default function App() {
             }`}
           >
             <BookOpen className={`w-6 h-6 mb-1 ${activeTab === 'knowledge' ? 'stroke-[2.5]' : ''}`} />
-            <span className="text-xs">知识库</span>
+            <span className="text-xs">{t('tab_knowledge')}</span>
           </button>
 
           <button
@@ -171,7 +210,7 @@ export default function App() {
             }`}
           >
             <ClipboardList className={`w-6 h-6 mb-1 ${activeTab === 'tickets' ? 'stroke-[2.5]' : ''}`} />
-            <span className="text-xs">工单</span>
+            <span className="text-xs">{t('tab_ticket')}</span>
           </button>
           
           <button
@@ -181,10 +220,18 @@ export default function App() {
             }`}
           >
             <User className={`w-6 h-6 mb-1 ${activeTab === 'profile' ? 'stroke-[2.5]' : ''}`} />
-            <span className="text-xs">我的</span>
+            <span className="text-xs">{t('tab_profile')}</span>
           </button>
         </div>
       </nav>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <LanguageProvider>
+      <AppContent />
+    </LanguageProvider>
   );
 }
