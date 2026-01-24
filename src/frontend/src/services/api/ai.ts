@@ -101,17 +101,41 @@ export function sendAIMessage(
 
       console.log('✅ 开始读取流式数据');
 
+      let buffer = ''; // 用于累积可能被分割的数据
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
+          // 处理缓冲区中剩余的数据
+          if (buffer.trim()) {
+            const lines = buffer.split('\n');
+            for (const line of lines) {
+              if (line.startsWith('data:')) {
+                try {
+                  const jsonStr = line.slice(5).trim();
+                  if (jsonStr) {
+                    const data = JSON.parse(jsonStr);
+                    console.log('✅ 解析 SSE 数据成功（缓冲区）:', data);
+                    onMessage(data);
+                  }
+                } catch (e) {
+                  console.error('❌ 解析 SSE 数据失败（缓冲区）:', line.substring(0, 200), e);
+                }
+              }
+            }
+          }
           console.log('✅ 流式数据读取完成');
           onComplete?.();
           break;
         }
 
-        const chunk = decoder.decode(value);
-        console.log('📦 收到数据块:', chunk);
-        const lines = chunk.split('\n');
+        // 解码数据并添加到缓冲区
+        buffer += decoder.decode(value, { stream: true });
+        console.log('📦 收到数据块，缓冲区大小:', buffer.length);
+        
+        // 按行分割处理（保留最后一行在缓冲区中，因为它可能不完整）
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
         for (const line of lines) {
           // 处理 SSE 数据行，支持 "data: " 和 "data:" 两种格式
@@ -120,12 +144,21 @@ export function sendAIMessage(
               // 去掉 "data:" 前缀，同时去除可能的空格
               const jsonStr = line.slice(5).trim();
               if (jsonStr) {
-                const data = JSON.parse(jsonStr);
-                console.log('✅ 解析 SSE 数据成功:', data);
-                onMessage(data);
+                try {
+                  const data = JSON.parse(jsonStr);
+                  console.log('✅ 解析 SSE 数据成功:', data);
+                  onMessage(data);
+                } catch (parseError: any) {
+                  // JSON解析失败，记录详细信息以便调试
+                  console.error('❌ 解析 SSE JSON 失败:', {
+                    error: parseError.message,
+                    jsonStr: jsonStr.substring(0, 200),
+                    jsonLength: jsonStr.length
+                  });
+                }
               }
             } catch (e) {
-              console.error('❌ 解析 SSE 数据失败:', line, e);
+              console.error('❌ 处理 SSE data 行失败:', line.substring(0, 200), e);
             }
           }
         }

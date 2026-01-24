@@ -21,6 +21,7 @@ function AppContent() {
   const [showRegister, setShowRegister] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('chat'); // 默认显示问答界面
   const [initialChatMessage, setInitialChatMessage] = useState<string>('');
+  const [savedChatInput, setSavedChatInput] = useState<string>(''); // 保存用户输入的问题
   const [userRole, setUserRole] = useState<UserRole>('enduser'); // 默认终端用户
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
@@ -58,6 +59,12 @@ function AppContent() {
   const handleLoginSuccess = () => {
     setIsLoggedIn(true);
     setShowLogin(false);
+    // 登录成功后，如果有保存的问题，恢复并清空保存的问题
+    if (savedChatInput) {
+      setInitialChatMessage(savedChatInput);
+      setSavedChatInput('');
+      setActiveTab('chat'); // 切换到问答界面
+    }
   };
 
   const handleRegisterSuccess = () => {
@@ -130,6 +137,9 @@ function AppContent() {
             initialMessage={initialChatMessage}
             onCreateTicket={handleCreateTicket}
             userRole={userRole}
+            isLoggedIn={isLoggedIn}
+            onShowLogin={handleShowLogin}
+            onSaveInput={(input: string) => setSavedChatInput(input)}
           />
         )}
         {activeTab === 'knowledge' && (
@@ -140,6 +150,8 @@ function AppContent() {
             onTicketClick={handleTicketClick}
             onCreateTicket={handleCreateTicket}
             onGoToChat={() => setActiveTab('chat')}
+            isLoggedIn={isLoggedIn}
+            onShowLogin={handleShowLogin}
           />
         )}
         {activeTab === 'ticket-detail' && selectedTicket && (
