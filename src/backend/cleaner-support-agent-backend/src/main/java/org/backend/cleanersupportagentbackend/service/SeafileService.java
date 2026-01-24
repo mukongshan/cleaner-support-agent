@@ -12,6 +12,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
+import org.springframework.web.util.UriUtils;
+import java.net.URI;
 
 /**
  * Seafile 服务封装
@@ -88,34 +90,35 @@ public class SeafileService {
      * @return 下载链接（临时链接，有时效性）
      */
     public String getDownloadLink(String filePath) {
-        String url = serverUrl + "/api/v2.1/via-repo-token/download-link/";
+        // 1. 基础 URL
+        String baseUrl = serverUrl + "/api/v2.1/via-repo-token/download-link/";
     
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + repoToken);
+        // 2. 手动对每一个参数进行严格编码
+        // 特别是 filePath，必须把 "/" 编码为 "%2F"
+        String encodedPath = UriUtils.encode(filePath, StandardCharsets.UTF_8);
+        String encodedRepoId = UriUtils.encode(repoId, StandardCharsets.UTF_8);
     
-        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("repo_id", repoId);
-    
-        // ✅ 直接使用原始路径，不要手动编码！！
-        
-        String encodedPath = URLEncoder.encode(filePath, StandardCharsets.UTF_8).replace("+", "%20");
-        params.add("path", encodedPath); 
+        // 3. 手动拼接 URL 字符串
+        StringBuilder urlBuilder = new StringBuilder(baseUrl);
+        urlBuilder.append("?repo_id=").append(encodedRepoId);
+        urlBuilder.append("&path=").append(encodedPath);
     
         if (StringUtils.hasText(repoPassword)) {
-            params.add("password", repoPassword);
+            urlBuilder.append("&password=").append(UriUtils.encode(repoPassword, StandardCharsets.UTF_8));
         }
     
-        HttpEntity<?> entity = new HttpEntity<>(headers);
-        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(url)
-                .queryParams(params);
-    
         try {
-            // 打印最终请求 URL，调试用
-            String finalUrl = builder.toUriString();
-            System.out.println("[DEBUG] 最终请求 URL: " + finalUrl);
+            // 4. 关键：转换为 java.net.URI 对象，防止 RestTemplate 二次编码
+            URI finalUri = new URI(urlBuilder.toString());
+            
+            System.out.println("[DEBUG] 最终请求 URI: " + finalUri);
+    
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + repoToken);
+            HttpEntity<?> entity = new HttpEntity<>(headers);
     
             ResponseEntity<String> response = restTemplate.exchange(
-                    finalUrl,
+                    finalUri, // 传入 URI 对象
                     HttpMethod.GET,
                     entity,
                     String.class
@@ -127,14 +130,10 @@ public class SeafileService {
                     downloadUrl = downloadUrl.trim().replaceAll("^[\"']|[\"']$", "");
                 }
                 return downloadUrl;
-            } else {
-                System.err.println("[ERROR] 获取下载链接失败，状态码: " + response.getStatusCode());
-                System.err.println("[ERROR] 响应内容: " + response.getBody());
             }
         } catch (Exception e) {
-            throw new RuntimeException("获取下载链接失败: " + e.getMessage() + ", request: " + builder.toUriString(), e);
+            throw new RuntimeException("获取下载链接失败: " + e.getMessage(), e);
         }
-    
         return null;
     }
 
