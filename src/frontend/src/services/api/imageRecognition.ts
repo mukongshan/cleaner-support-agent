@@ -223,26 +223,138 @@ export function sendAIMessageWithImage(
         throw new Error('Response body is null');
       }
 
+      let buffer = ''; // 用于累积可能被分割的数据
+      let currentDataBuffer = ''; // 当前正在累积的 data: 行内容
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
-          onComplete?.();
-          break;
-        }
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data:')) {
+          // 处理缓冲区中剩余的数据
+          if (currentDataBuffer.trim()) {
             try {
-              const jsonStr = line.slice(5).trim();
+              const jsonStr = currentDataBuffer.trim();
               if (jsonStr) {
                 const data = JSON.parse(jsonStr);
                 onMessage(data);
               }
             } catch (e) {
-              console.error('解析 SSE 数据失败:', line, e);
+              console.error('解析 SSE 数据失败（最终缓冲区）:', currentDataBuffer.substring(0, 200), e);
+            }
+          }
+          if (buffer.trim()) {
+            const lines = buffer.split('\n');
+            for (const line of lines) {
+              if (line.startsWith('data:')) {
+                try {
+                  const jsonStr = line.slice(5).trim();
+                  if (jsonStr) {
+                    const data = JSON.parse(jsonStr);
+                    onMessage(data);
+                  }
+                } catch (e) {
+                  console.error('解析 SSE 数据失败（缓冲区）:', line.substring(0, 200), e);
+                }
+              }
+            }
+          }
+          onComplete?.();
+          break;
+        }
+
+        // 解码数据并添加到缓冲区
+        buffer += decoder.decode(value, { stream: true });
+        
+        // 处理缓冲区中的数据
+        while (buffer.length > 0) {
+          // 查找下一个完整的行（以换行符结尾）
+          const newlineIndex = buffer.indexOf('\n');
+          
+          if (newlineIndex === -1) {
+            // 没有找到换行符，说明当前数据不完整，保留在缓冲区中
+            break;
+          }
+          
+          // 提取一行数据
+          const line = buffer.substring(0, newlineIndex);
+          buffer = buffer.substring(newlineIndex + 1);
+          
+          if (line.startsWith('data:')) {
+            // 如果之前有未完成的 data 行，先尝试合并
+            if (currentDataBuffer) {
+              // 将当前行的内容（去掉 data: 前缀）追加到缓冲区
+              const content = line.slice(5); // 去掉 "data:" 前缀
+              currentDataBuffer += content;
+            } else {
+              // 开始新的 data 行
+              currentDataBuffer = line.slice(5); // 去掉 "data:" 前缀
+            }
+            
+            // 尝试解析累积的JSON
+            try {
+              const jsonStr = currentDataBuffer.trim();
+              if (jsonStr) {
+                // 检查是否是完整的JSON（简单检查：以 { 开头，以 } 结尾，且括号匹配）
+                const openBraces = (jsonStr.match(/{/g) || []).length;
+                const closeBraces = (jsonStr.match(/}/g) || []).length;
+                const openQuotes = (jsonStr.match(/"/g) || []).length;
+                
+                // 如果括号和引号数量匹配，尝试解析
+                if (openBraces === closeBraces && openQuotes % 2 === 0) {
+                  try {
+                    const data = JSON.parse(jsonStr);
+                    onMessage(data);
+                    currentDataBuffer = ''; // 解析成功，清空缓冲区
+                  } catch (parseError: any) {
+                    // JSON解析失败，可能是数据仍然不完整，继续累积
+                    // 只在调试时记录
+                    if (parseError.message.includes('Unterminated') || parseError.message.includes('Unexpected token')) {
+                      // 这是预期的错误，数据可能还在传输中
+                      continue;
+                    } else {
+                      console.error('解析 SSE JSON 失败:', {
+                        error: parseError.message,
+                        jsonStr: jsonStr.substring(0, 200),
+                        jsonLength: jsonStr.length
+                      });
+                      // 如果错误不是"未完成"类型的，清空缓冲区继续
+                      currentDataBuffer = '';
+                    }
+                  }
+                }
+                // 如果括号或引号不匹配，继续累积数据
+              }
+            } catch (e) {
+              console.error('处理 SSE data 行失败:', currentDataBuffer.substring(0, 200), e);
+              currentDataBuffer = ''; // 出错时清空缓冲区
+            }
+          } else if (currentDataBuffer && line.trim()) {
+            // 如果当前有未完成的 data 行，且当前行不是以 data: 开头，可能是 data 行的继续
+            // 将当前行追加到缓冲区
+            currentDataBuffer += line;
+            
+            // 尝试解析合并后的数据
+            try {
+              const jsonStr = currentDataBuffer.trim();
+              if (jsonStr) {
+                const openBraces = (jsonStr.match(/{/g) || []).length;
+                const closeBraces = (jsonStr.match(/}/g) || []).length;
+                const openQuotes = (jsonStr.match(/"/g) || []).length;
+                
+                if (openBraces === closeBraces && openQuotes % 2 === 0) {
+                  try {
+                    const data = JSON.parse(jsonStr);
+                    onMessage(data);
+                    currentDataBuffer = '';
+                  } catch (parseError: any) {
+                    if (!parseError.message.includes('Unterminated') && !parseError.message.includes('Unexpected token')) {
+                      console.error('解析合并后的 JSON 失败:', parseError.message);
+                      currentDataBuffer = '';
+                    }
+                  }
+                }
+              }
+            } catch (e) {
+              // 继续累积
             }
           }
         }

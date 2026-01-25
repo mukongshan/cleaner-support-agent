@@ -36,6 +36,7 @@ import aiAvatar from '../assets/images/ai_avatar.png';
 import { useLanguage } from '../contexts/LanguageContext';
 import { uploadAndRecognizeImage, sendAIMessageWithImage, ImageRecognitionResponse } from '../services/api/imageRecognition';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { ImageWithAuth } from './ImageWithAuth';
 
 interface Message {
   id: string;
@@ -62,6 +63,9 @@ interface ChatPageProps {
   initialMessage?: string;
   onCreateTicket?: () => void;
   userRole: UserRole;
+  isLoggedIn?: boolean;
+  onShowLogin?: () => void;
+  onSaveInput?: (input: string) => void;
 }
 
 interface TicketFormData {
@@ -82,7 +86,7 @@ interface AIExtractedInfo {
   images: string[];
 }
 
-export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageProps) {
+export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn = false, onShowLogin, onSaveInput }: ChatPageProps) {
   const { t, language } = useLanguage();
   // 聊天会话管理
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
@@ -130,6 +134,9 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
   const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
   const [currentMessageId, setCurrentMessageId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // 登录提示框状态
+  const [showLoginTip, setShowLoginTip] = useState(false);
 
   // 图片识别相关状态
   interface ImageItem {
@@ -764,6 +771,25 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
       timestamp: new Date().toISOString()
     });
 
+    // 检查登录状态
+    if (!isLoggedIn) {
+      // 保存用户输入的问题
+      if (text.trim() && onSaveInput) {
+        onSaveInput(text.trim());
+      }
+      // 显示登录提示框
+      setShowLoginTip(true);
+      // 2秒后自动隐藏提示框
+      setTimeout(() => {
+        setShowLoginTip(false);
+      }, 2000);
+      // 跳转到登录页面
+      if (onShowLogin) {
+        onShowLogin();
+      }
+      return;
+    }
+
     // 模式A：图文混发 - 有文本且有已识别的图片
     // 模式B：仅发图片 - 无文本但有已识别的图片
     const hasText = text.trim().length > 0;
@@ -829,11 +855,11 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
         });
         setMessages(prev => [...prev, userMessage]);
       } else {
-        // 仅发图片，添加图片消息
+        // 仅发图片，添加图片消息（不显示文字，只显示图片）
         const userMessage: Message = {
           id: Date.now().toString(),
           type: 'user',
-          content: '[图片]',
+          content: '', // 仅发图片时不显示文字
           image: completedImages[0].imageUrl,
           timestamp: new Date()
         };
@@ -891,19 +917,35 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
         },
         (event) => {
           if (event.event === 'message' && event.answer) {
-            fullAnswer = event.answer;
+            // 累积流式响应内容（event.answer 是增量内容）
+            fullAnswer += event.answer;
             console.log('[ChatPage] [发送消息] 收到AI消息片段', {
               aiMessageId,
               answerLength: event.answer.length,
               fullAnswerLength: fullAnswer.length
             });
-            setMessages(prev =>
-              prev.map(msg =>
-                msg.id === aiMessageId
-                  ? { ...msg, content: fullAnswer }
-                  : msg
-              )
-            );
+            // 更新或添加 AI 消息（确保消息存在）
+            setMessages(prev => {
+              const lastMsg = prev[prev.length - 1];
+              if (lastMsg && lastMsg.id === aiMessageId) {
+                // 更新现有消息
+                return prev.map(msg =>
+                  msg.id === aiMessageId
+                    ? { ...msg, content: fullAnswer }
+                    : msg
+                );
+              } else {
+                // 如果消息不存在，添加新消息
+                console.log('[ChatPage] [发送消息] 添加新 AI 消息（图片对话）');
+                return [...prev, {
+                  id: aiMessageId,
+                  type: 'ai' as const,
+                  content: fullAnswer,
+                  timestamp: new Date(),
+                  rating: null
+                }];
+              }
+            });
           } else if (event.event === 'message_end') {
             console.log('[ChatPage] [发送消息] AI消息结束', {
               aiMessageId,
@@ -915,6 +957,37 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
             setAiThinking(false);
             setThinkingStep(0);
 
+            // 确保消息存在且内容正确
+            setMessages(prev => {
+              const existingMsg = prev.find(msg => msg.id === aiMessageId);
+              if (!existingMsg) {
+                // 如果消息不存在，创建新消息
+                console.log('[ChatPage] [发送消息] 消息结束时创建新消息（图片对话）');
+                return [...prev, {
+                  id: aiMessageId,
+                  type: 'ai' as const,
+                  content: fullAnswer || '抱歉，没有收到回复。请稍后重试。',
+                  timestamp: new Date(),
+                  rating: null
+                }];
+              } else if (!fullAnswer || fullAnswer.trim() === '') {
+                // 如果没有收到任何回答，更新为错误提示
+                console.warn('[ChatPage] [发送消息] 未收到 AI 回答（图片对话）');
+                return prev.map(msg =>
+                  msg.id === aiMessageId
+                    ? { ...msg, content: '抱歉，没有收到回复。请稍后重试。' }
+                    : msg
+                );
+              } else {
+                // 确保最终内容正确
+                return prev.map(msg =>
+                  msg.id === aiMessageId
+                    ? { ...msg, content: fullAnswer }
+                    : msg
+                );
+              }
+            });
+
             if (event.conversation_id && !conversationIdSaved) {
               console.log('[ChatPage] [发送消息] 保存会话ID', {
                 conversationId: event.conversation_id,
@@ -925,7 +998,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
             }
 
             // 生成相关问题
-            if (fullAnswer) {
+            if (fullAnswer && fullAnswer.trim()) {
               const questions = getFollowUpQuestions(fullAnswer);
               console.log('[ChatPage] [发送消息] 生成相关问题', {
                 aiMessageId,
@@ -1183,10 +1256,15 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
   useEffect(() => {
     // 等待初始加载完成后再处理 initialMessage
     if (isInitialLoadComplete && initialMessage && initialMessage.trim()) {
-      handleSendMessage(initialMessage);
+      // 如果用户已登录，恢复输入框内容（这是登录后恢复的问题）
+      if (isLoggedIn) {
+        setInputText(initialMessage);
+        // 自动发送消息
+        handleSendMessage(initialMessage);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialMessage, isInitialLoadComplete]);
+  }, [initialMessage, isInitialLoadComplete, isLoggedIn]);
 
   const getAIResponse = (userText: string): string => {
     const lowerText = userText.toLowerCase();
@@ -1564,18 +1642,107 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
                       : 'bg-white text-gray-900 rounded-tl-sm shadow-sm'
                       }`}
                   >
-                    {message.image && (
-                      <img
-                        src={message.image.startsWith('http') ? message.image : `${API_BASE_URL}${message.image}`}
-                        alt="上传的图片"
-                        className="w-full max-w-xs rounded-lg mb-2 object-cover"
-                        onError={(e) => {
-                          console.error('[ChatPage] 图片加载失败:', message.image);
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
+                    {message.type === 'user' && message.image ? (
+                      // 用户消息：图片在右侧，文字在下方
+                      (() => {
+                        // 处理图片URL：支持完整URL和相对路径
+                        const getImageUrl = (imageUrl: string | undefined): string => {
+                          if (!imageUrl) return '';
+                          // 如果是完整 URL（以 http:// 或 https:// 开头），直接返回
+                          if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+                            return imageUrl;
+                          }
+                          // 如果路径已经包含 /api，直接使用 API_BASE_URL 拼接
+                          if (imageUrl.startsWith('/api')) {
+                            const match = API_BASE_URL.match(/^(https?:\/\/[^\/]+)/);
+                            const serverUrl = match ? match[1] : window.location.origin;
+                            return `${serverUrl}${imageUrl}`;
+                          }
+                          // 如果是相对路径，拼接服务器基础URL（不包含 /api 路径）
+                          const match = API_BASE_URL.match(/^(https?:\/\/[^\/]+)/);
+                          const serverUrl = match ? match[1] : window.location.origin;
+                          // 确保路径以 / 开头
+                          const path = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+                          return `${serverUrl}${path}`;
+                        };
+                        
+                        const imageUrl = getImageUrl(message.image);
+                        
+                        return (
+                          <div className="flex flex-col">
+                            {/* 上半部分：图片缩略图贴着右侧 */}
+                            <div className="flex justify-end mb-2">
+                              <ImageWithAuth
+                                src={message.image}
+                                alt="上传的图片"
+                                className="max-w-[120px] max-h-[120px] rounded-lg object-cover border-2 border-white/20 shadow-sm"
+                                style={{
+                                  cursor: 'pointer'
+                                }}
+                                onClick={() => {
+                                  // 点击图片可以放大查看
+                                  const fullUrl = getImageUrl(message.image);
+                                  window.open(fullUrl, '_blank');
+                                }}
+                              />
+                            </div>
+                            {/* 下半部分：用户补充的文字内容 */}
+                            {message.content && message.content.trim() && (
+                              <p className="text-sm whitespace-pre-line">
+                                {message.content}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()
+                    ) : message.image ? (
+                      // AI消息或其他消息：保持原有布局
+                      (() => {
+                        const getImageUrl = (imageUrl: string | undefined): string => {
+                          if (!imageUrl) return '';
+                          // 如果是完整 URL（以 http:// 或 https:// 开头），直接返回
+                          if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+                            return imageUrl;
+                          }
+                          // 如果路径已经包含 /api，直接使用 API_BASE_URL 拼接
+                          if (imageUrl.startsWith('/api')) {
+                            const match = API_BASE_URL.match(/^(https?:\/\/[^\/]+)/);
+                            const serverUrl = match ? match[1] : window.location.origin;
+                            return `${serverUrl}${imageUrl}`;
+                          }
+                          // 如果是相对路径，拼接服务器基础URL（不包含 /api 路径）
+                          const match = API_BASE_URL.match(/^(https?:\/\/[^\/]+)/);
+                          const serverUrl = match ? match[1] : window.location.origin;
+                          const path = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+                          return `${serverUrl}${path}`;
+                        };
+                        
+                        const imageUrl = getImageUrl(message.image);
+                        
+                        return (
+                          <div className="mb-2">
+                            <ImageWithAuth
+                              src={message.image}
+                              alt="上传的图片"
+                              className="max-w-[200px] max-h-[200px] rounded-lg object-cover border-2 border-white/20 shadow-sm"
+                              style={{
+                                cursor: 'pointer'
+                              }}
+                              onClick={() => {
+                                const fullUrl = getImageUrl(message.image);
+                                window.open(fullUrl, '_blank');
+                              }}
+                            />
+                          </div>
+                        );
+                      })()
+                    ) : null}
+                    {/* 纯文字消息 */}
+                    {!message.image && message.content && (
+                      <p className="text-sm whitespace-pre-line">
+                        {message.content}
+                      </p>
                     )}
-                    <p className="text-sm whitespace-pre-line">{message.content}</p>
 
                     {message.citation && (
                       <div className="mt-3 pt-3 border-t border-gray-200">
@@ -1928,7 +2095,47 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
         )}
       </AnimatePresence>
 
-
+      {/* 登录提示框 */}
+      <AnimatePresence>
+        {showLoginTip && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.3 }}
+            style={{
+              position: 'fixed',
+              // 1. 改用 bottom 定位，更容易控制在页面下方
+              bottom: '15%',
+              left: 0,
+              // 2. 宽度设为 100%，配合 flex 布局实现真正的水平居中
+              width: '100%',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 60,
+              pointerEvents: 'none',
+              boxSizing: 'border-box',
+              padding: '0 16px'
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: '#ffffff',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                // 优化阴影，使其看起来更轻盈
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                border: '1px solid #e5e7eb',
+                whiteSpace: 'nowrap',
+                pointerEvents: 'auto' // 如果需要点击提示框，可以设为 auto
+              }}
+            >
+              <p style={{ fontSize: '14px', color: '#374151', margin: 0 }}>请登录后使用</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* 输入区域 */}
       <div
         className="px-4 py-3 pb-safe relative z-10"
@@ -2124,7 +2331,23 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole }: ChatPageP
 
           {/* 3. 图片按钮 - 固定 40x40 */}
           <button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => {
+              // 检查登录状态
+              if (!isLoggedIn) {
+                // 显示登录提示框
+                setShowLoginTip(true);
+                // 2秒后自动隐藏提示框
+                setTimeout(() => {
+                  setShowLoginTip(false);
+                }, 2000);
+                // 跳转到登录页面
+                if (onShowLogin) {
+                  onShowLogin();
+                }
+                return;
+              }
+              fileInputRef.current?.click();
+            }}
             className="haptic-feedback flex-shrink-0"
             style={{
               height: '40px',

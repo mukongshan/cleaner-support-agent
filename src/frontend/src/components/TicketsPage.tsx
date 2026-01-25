@@ -21,7 +21,8 @@ import {
   Sparkles,
   Check,
   Bot,
-  Loader
+  Loader,
+  ClipboardList
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -55,9 +56,11 @@ interface TicketsPageProps {
   onTicketClick?: (ticket: Ticket) => void;
   onCreateTicket?: () => void;
   onGoToChat?: () => void;
+  isLoggedIn?: boolean;
+  onShowLogin?: () => void;
 }
 
-export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: TicketsPageProps) {
+export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat, isLoggedIn = false, onShowLogin }: TicketsPageProps) {
   const { t } = useLanguage();
   const [selectedFilter, setSelectedFilter] = useState<'all' | TicketStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -80,10 +83,12 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // 加载工单列表
+  // 加载工单列表（仅在登录时）
   useEffect(() => {
-    loadTickets();
-  }, [selectedFilter]);
+    if (isLoggedIn) {
+      loadTickets();
+    }
+  }, [selectedFilter, isLoggedIn]);
 
   const loadTickets = async () => {
     try {
@@ -257,6 +262,13 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
   };
 
   const handleCreateTicketClick = () => {
+    // 检查登录状态
+    if (!isLoggedIn) {
+      if (onShowLogin) {
+        onShowLogin();
+      }
+      return;
+    }
     setShowCreatePrompt(true);
   };
 
@@ -324,96 +336,128 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
 
   return (
     <div className="h-full flex flex-col bg-transparent">
-      {/* 顶部 */}
-      <div
-        className="px-4 py-4 relative z-10"
-        style={{
-          backdropFilter: 'blur(12px)',
-          backgroundColor: 'rgba(255, 255, 255, 0.1)'
-        }}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">{t('my_tickets')}</h2>
-          <button
-            onClick={handleCreateTicketClick}
-            className="p-2 text-gray-900 hover:bg-gray-100 rounded-lg transition-colors haptic-feedback"
+      {/* 未登录提示 */}
+      {!isLoggedIn ? (
+        <>
+          {/* 顶部标题 */}
+          <div
+            className="px-4 py-4 relative z-10"
+            style={{
+              backdropFilter: 'blur(12px)',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)'
+            }}
           >
-            <Plus className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* 搜索框 */}
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t('search_ticket_placeholder')}
-            className="w-full pl-10 pr-4 py-2.5 bg-gray-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          />
-        </div>
-
-        {/* 统计卡片 */}
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 text-center">
-            <div className="text-2xl font-bold text-blue-600">{statusCounts.all}</div>
-            <div className="text-xs text-blue-700 mt-1">{t('all_tickets')}</div>
+            <h2 className="text-lg font-semibold text-gray-900">{t('my_tickets')}</h2>
           </div>
-          <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-3 text-center">
-            <div className="text-2xl font-bold text-yellow-600">{statusCounts.processing}</div>
-            <div className="text-xs text-yellow-700 mt-1">{t('processing')}</div>
-          </div>
-          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-3 text-center">
-            <div className="text-2xl font-bold text-green-600">{statusCounts.completed}</div>
-            <div className="text-xs text-green-700 mt-1">{t('completed')}</div>
-          </div>
-        </div>
 
-        {/* 过滤标签 */}
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-          <button
-            onClick={() => setSelectedFilter('all')}
-            className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm transition-all haptic-feedback ${selectedFilter === 'all'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'bg-gray-100 text-gray-600'
-              }`}
+          {/* 未登录提示内容 */}
+          <div className="flex-1 flex flex-col items-center justify-center px-4">
+            <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center mb-6">
+              <ClipboardList className="w-12 h-12 text-gray-400" />
+            </div>
+            <p className="text-gray-600 text-sm mb-6">请登录后使用工单功能</p>
+            {onShowLogin && (
+              <button
+                onClick={onShowLogin}
+                className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors haptic-feedback"
+              >
+                去登录
+              </button>
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          {/* 顶部 */}
+          <div
+            className="px-4 py-4 relative z-10"
+            style={{
+              backdropFilter: 'blur(12px)',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)'
+            }}
           >
-            {t('all')} ({statusCounts.all})
-          </button>
-          <button
-            onClick={() => setSelectedFilter('pending')}
-            className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm transition-all haptic-feedback ${selectedFilter === 'pending'
-              ? 'bg-yellow-600 text-white shadow-sm'
-              : 'bg-gray-100 text-gray-600'
-              }`}
-          >
-            {t('pending')} ({statusCounts.pending})
-          </button>
-          <button
-            onClick={() => setSelectedFilter('processing')}
-            className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm transition-all haptic-feedback ${selectedFilter === 'processing'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'bg-gray-100 text-gray-600'
-              }`}
-          >
-            {t('processing')} ({statusCounts.processing})
-          </button>
-          <button
-            onClick={() => setSelectedFilter('completed')}
-            className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm transition-all haptic-feedback ${selectedFilter === 'completed'
-              ? 'bg-green-600 text-white shadow-sm'
-              : 'bg-gray-100 text-gray-600'
-              }`}
-          >
-            {t('completed')} ({statusCounts.completed})
-          </button>
-        </div>
-      </div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">{t('my_tickets')}</h2>
+              <button
+                onClick={handleCreateTicketClick}
+                className="p-2 text-gray-900 hover:bg-gray-100 rounded-lg transition-colors haptic-feedback"
+              >
+                <Plus className="w-5 h-5" />
+              </button>
+            </div>
 
-      {/* 工单列表 */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 relative z-0">
-        {loading ? (
+            {/* 搜索框 */}
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t('search_ticket_placeholder')}
+                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              />
+            </div>
+
+            {/* 统计卡片 */}
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 text-center">
+                <div className="text-2xl font-bold text-blue-600">{statusCounts.all}</div>
+                <div className="text-xs text-blue-700 mt-1">{t('all_tickets')}</div>
+              </div>
+              <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-3 text-center">
+                <div className="text-2xl font-bold text-yellow-600">{statusCounts.processing}</div>
+                <div className="text-xs text-yellow-700 mt-1">{t('processing')}</div>
+              </div>
+              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-3 text-center">
+                <div className="text-2xl font-bold text-green-600">{statusCounts.completed}</div>
+                <div className="text-xs text-green-700 mt-1">{t('completed')}</div>
+              </div>
+            </div>
+
+            {/* 过滤标签 */}
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              <button
+                onClick={() => setSelectedFilter('all')}
+                className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm transition-all haptic-feedback ${selectedFilter === 'all'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-600'
+                  }`}
+              >
+                {t('all')} ({statusCounts.all})
+              </button>
+              <button
+                onClick={() => setSelectedFilter('pending')}
+                className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm transition-all haptic-feedback ${selectedFilter === 'pending'
+                  ? 'bg-yellow-600 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-600'
+                  }`}
+              >
+                {t('pending')} ({statusCounts.pending})
+              </button>
+              <button
+                onClick={() => setSelectedFilter('processing')}
+                className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm transition-all haptic-feedback ${selectedFilter === 'processing'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-600'
+                  }`}
+              >
+                {t('processing')} ({statusCounts.processing})
+              </button>
+              <button
+                onClick={() => setSelectedFilter('completed')}
+                className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm transition-all haptic-feedback ${selectedFilter === 'completed'
+                  ? 'bg-green-600 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-600'
+                  }`}
+              >
+                {t('completed')} ({statusCounts.completed})
+              </button>
+            </div>
+          </div>
+
+          {/* 工单列表 */}
+          <div className="flex-1 overflow-y-auto px-4 py-4 relative z-0">
+            {loading ? (
           <div className="flex flex-col items-center justify-center h-full">
             <Loader className="w-12 h-12 text-blue-600 animate-spin mb-4" />
             <p className="text-sm text-gray-500">加载工单中...</p>
@@ -599,9 +643,9 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
                 </motion.div>
               );
             })}
+            </div>
+            )}
           </div>
-        )}
-      </div>
 
       {/* 底部提示
       <div 
@@ -617,9 +661,9 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
         </div>
       </div> */}
 
-      {/* 创建工单提示对话框 */}
-      <AnimatePresence>
-        {showCreatePrompt && (
+          {/* 创建工单提示对话框 */}
+          <AnimatePresence>
+            {showCreatePrompt && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -679,12 +723,12 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
               </div>
             </motion.div>
           </motion.div>
-        )}
-      </AnimatePresence>
+            )}
+          </AnimatePresence>
 
-      {/* 创建工单表单 - 使用统一的 TicketForm 组件 */}
-      <AnimatePresence>
-        {showTicketForm && (
+          {/* 创建工单表单 - 使用统一的 TicketForm 组件 */}
+          <AnimatePresence>
+            {showTicketForm && (
           <TicketForm
             formData={ticketFormData}
             onFormDataChange={setTicketFormData}
@@ -692,9 +736,11 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat }: Ticke
             onCancel={() => setShowTicketForm(false)}
             submitting={submitting}
             error={error}
-          />
-        )}
-      </AnimatePresence>
+            />
+            )}
+          </AnimatePresence>
+        </>
+      )}
     </div>
   );
 }
