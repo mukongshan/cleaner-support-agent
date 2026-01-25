@@ -67,7 +67,7 @@ app:
     # Qwen-VL API配置
     qwen-vl:
       api-url: ${QWEN_VL_API_URL:https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation}
-      api-key: ${QWEN_VL_API_KEY:sk-2f3b3ddd74ed467ea1a09190001c3a24}
+      api-key: ${QWEN_VL_API_KEY:}
       model: ${QWEN_VL_MODEL:qwen-vl-plus}  # qwen-vl-max, qwen-vl-plus
       timeout: ${QWEN_VL_TIMEOUT:30000}    # 30秒超时
       max-retries: ${QWEN_VL_MAX_RETRIES:3}
@@ -84,7 +84,7 @@ app:
 # Seafile 配置
 seafile:
   server-url: ${SEAFILE_SERVER_URL:https://box.nju.edu.cn}
-  repo-token: ${SEAFILE_REPO_TOKEN:e09e87d735571b5fbad8f39a45e1d348e81889e7}
+  repo-token: ${SEAFILE_REPO_TOKEN:}
   repo-id: ${SEAFILE_REPO_ID:9136e9de-f49e-45f6-9aff-9e3abe07a257}
   repo-password: ${SEAFILE_REPO_PASSWORD:}
 
