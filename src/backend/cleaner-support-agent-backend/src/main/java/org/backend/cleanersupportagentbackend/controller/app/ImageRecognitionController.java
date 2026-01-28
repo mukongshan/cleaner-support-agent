@@ -2,6 +2,7 @@ package org.backend.cleanersupportagentbackend.controller.app;
 
 import org.backend.cleanersupportagentbackend.annotation.CurrentUserId;
 import org.backend.cleanersupportagentbackend.controller.ApiResponse;
+import org.backend.cleanersupportagentbackend.dto.ImageRecognitionBase64Request;
 import org.backend.cleanersupportagentbackend.dto.ImageRecognitionHistoryResponse;
 import org.backend.cleanersupportagentbackend.dto.ImageRecognitionResponse;
 import org.backend.cleanersupportagentbackend.service.ImageRecognitionService;
@@ -38,6 +39,29 @@ public class ImageRecognitionController {
             return ResponseEntity.ok(ApiResponse.error(400, e.getMessage()));
         } catch (IOException e) {
             return ResponseEntity.ok(ApiResponse.error(500, "文件上传失败：" + e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.ok(ApiResponse.error(500, e.getMessage()));
+        }
+    }
+
+    /**
+     * base64上传并识别（便于联调/自动化测试）
+     */
+    @PostMapping("/base64")
+    public ResponseEntity<ApiResponse<ImageRecognitionResponse>> uploadAndRecognizeBase64(
+            @CurrentUserId String userId,
+            @RequestBody ImageRecognitionBase64Request request) {
+        try {
+            ImageRecognitionResponse response = imageRecognitionService.recognizeImageBase64(
+                    userId,
+                    request != null ? request.getBase64() : null,
+                    request != null ? request.getFormat() : null
+            );
+            return ResponseEntity.ok(ApiResponse.success(response));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.ok(ApiResponse.error(400, e.getMessage()));
+        } catch (IOException e) {
+            return ResponseEntity.ok(ApiResponse.error(500, "文件保存失败：" + e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.ok(ApiResponse.error(500, e.getMessage()));
         }

@@ -19,7 +19,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -67,58 +66,71 @@ public class ImageRecognitionService {
             Files.createDirectories(uploadPath);
         }
         
-        // 生成唯一文件名
         String originalFilename = image.getOriginalFilename();
         String extension = originalFilename != null && originalFilename.contains(".")
                 ? originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase()
                 : "jpg";
-        String filename = UUID.randomUUID().toString() + "." + extension;
-        Path filePath = uploadPath.resolve(filename);
-        
-        // 保存图片文件
-        Files.copy(image.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-        
-        // 生成识别ID
-        String recognitionId = IdGenerator.generateRecognitionId();
-        
-        // 构建图片URL
-        String imageUrl = "/api/cleaner-support/v2/media/images/" + filename;
-        
-        // 创建识别记录（初始状态为pending）
-        ImageRecognition recognition = ImageRecognition.builder()
-                .recognitionId(recognitionId)
-                .user(user)
-                .imageUrl(imageUrl)
-                .imagePath(filePath.toString())
-                .status(RecognitionStatus.pending)
-                .build();
-        imageRecognitionRepository.save(recognition);
-        
-        try {
-            // 更新状态为processing
-            recognition.setStatus(RecognitionStatus.processing);
-            imageRecognitionRepository.save(recognition);
-            
-            // 读取图片字节
-            byte[] imageBytes = Files.readAllBytes(filePath);
-            
-            // 调用Qwen-VL API识别图片
-            String description = qwenVLClient.recognizeImage(imageBytes, extension);
-            
-            // 更新识别结果
-            recognition.setDescription(description);
-            recognition.setStatus(RecognitionStatus.completed);
-            imageRecognitionRepository.save(recognition);
-            
-            return toResponse(recognition);
-        } catch (Exception e) {
-            // 识别失败，更新状态和错误信息
-            recognition.setStatus(RecognitionStatus.failed);
-            recognition.setErrorMessage(e.getMessage());
-            imageRecognitionRepository.save(recognition);
-            
-            throw new RuntimeException("图片识别失败：" + e.getMessage(), e);
+
+        // 保存图片并完成识别
+        Path filePath = saveBytesToFile(uploadPath, image.getBytes(), extension);
+        return recognizeFromSavedFile(user, filePath, extension);
+    }
+
+    /**
+     * base64方式识别（便于联调/自动化，不依赖本地图片文件）
+     */
+    @Transactional
+    public ImageRecognitionResponse recognizeImageBase64(String userId, String base64, String format) throws IOException {
+        User user = userService.getUserByUserId(userId);
+
+        if (base64 == null || base64.isBlank()) {
+            throw new IllegalArgumentException("base64不能为空");
         }
+
+        // 创建上传目录
+        Path uploadPath = Paths.get(uploadDir);
+        if (!Files.exists(uploadPath)) {
+            Files.createDirectories(uploadPath);
+        }
+
+        // 支持 data URI：data:image/png;base64,xxxx
+        String resolvedFormat = format;
+        String resolvedBase64 = base64.trim();
+        if (resolvedBase64.startsWith("data:")) {
+            int commaIdx = resolvedBase64.indexOf(',');
+            if (commaIdx > 0) {
+                String meta = resolvedBase64.substring(0, commaIdx);
+                resolvedBase64 = resolvedBase64.substring(commaIdx + 1);
+                // meta 示例：data:image/png;base64
+                int slash = meta.indexOf('/');
+                int semi = meta.indexOf(';');
+                if (slash > 0 && semi > slash) {
+                    resolvedFormat = meta.substring(slash + 1, semi);
+                }
+            }
+        }
+
+        if (resolvedFormat == null || resolvedFormat.isBlank()) {
+            resolvedFormat = "png";
+        }
+        resolvedFormat = resolvedFormat.toLowerCase();
+
+        // 简单复用 allowedFormats 规则
+        validateExtension(resolvedFormat);
+
+        byte[] imageBytes;
+        try {
+            imageBytes = java.util.Base64.getDecoder().decode(resolvedBase64);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("base64解析失败：" + e.getMessage());
+        }
+
+        if (imageBytes.length > maxFileSize) {
+            throw new IllegalArgumentException("图片大小不能超过 " + (maxFileSize / 1024 / 1024) + "MB");
+        }
+
+        Path filePath = saveBytesToFile(uploadPath, imageBytes, resolvedFormat);
+        return recognizeFromSavedFile(user, filePath, resolvedFormat);
     }
 
     /**
@@ -178,19 +190,74 @@ public class ImageRecognitionService {
         if (originalFilename == null) {
             throw new IllegalArgumentException("无法获取文件名");
         }
-        
+
+        if (!originalFilename.contains(".")) {
+            throw new IllegalArgumentException("文件名缺少扩展名");
+        }
+
         String extension = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
+        validateExtension(extension);
+    }
+
+    private void validateExtension(String extension) {
         String[] allowed = allowedFormats.split(",");
-        boolean isValid = false;
         for (String format : allowed) {
             if (format.trim().equalsIgnoreCase(extension)) {
-                isValid = true;
-                break;
+                return;
             }
         }
-        
-        if (!isValid) {
-            throw new IllegalArgumentException("不支持的图片格式，仅支持：" + allowedFormats);
+        throw new IllegalArgumentException("不支持的图片格式，仅支持：" + allowedFormats);
+    }
+
+    private Path saveBytesToFile(Path uploadPath, byte[] bytes, String extension) throws IOException {
+        String filename = UUID.randomUUID().toString() + "." + extension;
+        Path filePath = uploadPath.resolve(filename);
+        Files.write(filePath, bytes);
+        return filePath;
+    }
+
+    private ImageRecognitionResponse recognizeFromSavedFile(User user, Path filePath, String extension) {
+        // 生成识别ID
+        String recognitionId = IdGenerator.generateRecognitionId();
+
+        // 构建图片URL
+        String filename = filePath.getFileName().toString();
+        String imageUrl = "/api/cleaner-support/v2/media/images/" + filename;
+
+        // 创建识别记录（初始状态为pending）
+        ImageRecognition recognition = ImageRecognition.builder()
+                .recognitionId(recognitionId)
+                .user(user)
+                .imageUrl(imageUrl)
+                .imagePath(filePath.toString())
+                .status(RecognitionStatus.pending)
+                .build();
+        imageRecognitionRepository.save(recognition);
+
+        try {
+            // 更新状态为processing
+            recognition.setStatus(RecognitionStatus.processing);
+            imageRecognitionRepository.save(recognition);
+
+            // 读取图片字节
+            byte[] imageBytes = Files.readAllBytes(filePath);
+
+            // 调用Qwen-VL API识别图片
+            String description = qwenVLClient.recognizeImage(imageBytes, extension);
+
+            // 更新识别结果
+            recognition.setDescription(description);
+            recognition.setStatus(RecognitionStatus.completed);
+            imageRecognitionRepository.save(recognition);
+
+            return toResponse(recognition);
+        } catch (Exception e) {
+            // 识别失败，更新状态和错误信息
+            recognition.setStatus(RecognitionStatus.failed);
+            recognition.setErrorMessage(e.getMessage());
+            imageRecognitionRepository.save(recognition);
+
+            throw new RuntimeException("图片识别失败：" + e.getMessage(), e);
         }
     }
 

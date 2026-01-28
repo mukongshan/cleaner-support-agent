@@ -44,6 +44,12 @@ public class QwenVLClient {
     @Value("${app.image-recognition.qwen-vl.max-retries:3}")
     private int maxRetries;
 
+    /**
+     * 本地联调/演示用：开启后不调用外部API，直接返回模拟描述
+     */
+    @Value("${app.image-recognition.qwen-vl.mock:false}")
+    private boolean mockEnabled;
+
     public QwenVLClient() {
         this.webClient = WebClient.builder()
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -60,6 +66,18 @@ public class QwenVLClient {
      */
     public String recognizeImage(byte[] imageBytes, String imageFormat) {
         try {
+            if (mockEnabled) {
+                int size = imageBytes != null ? imageBytes.length : 0;
+                return "MOCK: 已接收到图片（format=" + imageFormat + ", bytes=" + size + "）。" +
+                        "如需真实识别，请配置环境变量 QWEN_VL_API_KEY 并关闭 mock。";
+            }
+
+            if (apiKey == null || apiKey.isBlank()) {
+                throw new IllegalStateException("未配置Qwen-VL API Key：请设置环境变量 QWEN_VL_API_KEY，" +
+                        "或在 application.yml 配置 app.image-recognition.qwen-vl.api-key；" +
+                        "本地联调可临时开启 app.image-recognition.qwen-vl.mock=true。");
+            }
+
             // 将图片转换为base64
             String base64Image = Base64.getEncoder().encodeToString(imageBytes);
             String imageDataUri = "data:image/" + imageFormat + ";base64," + base64Image;
@@ -76,9 +94,19 @@ public class QwenVLClient {
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                     .bodyValue(requestBody)
                     .retrieve()
+                    .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(),
+                            clientResponse -> clientResponse.bodyToMono(String.class)
+                                    .defaultIfEmpty("")
+                                    .map(body -> new RuntimeException("Qwen-VL HTTP错误：" +
+                                            clientResponse.statusCode().value() + " " +
+                                            clientResponse.statusCode().toString() +
+                                            (body.isBlank() ? "" : ("，body=" + body)))))
                     .bodyToMono(String.class)
                     .timeout(Duration.ofMillis(timeout))
-                    .retryWhen(Retry.fixedDelay(maxRetries, Duration.ofSeconds(1)))
+                    // 仅对“可恢复”的异常做重试；并在重试耗尽时抛出最后一次失败原因（不要只返回 retries exhausted）
+                    .retryWhen(Retry.fixedDelay(maxRetries, Duration.ofSeconds(1))
+                            .filter(this::isRetryable)
+                            .onRetryExhaustedThrow((spec, signal) -> signal.failure()))
                     .block();
             
             // 记录API响应（截取前500字符避免日志过长）
@@ -95,8 +123,28 @@ public class QwenVLClient {
             
             return description;
         } catch (Exception e) {
-            throw new RuntimeException("图片识别失败：" + e.getMessage(), e);
+            // 把根因尽量带出来，方便联调定位（DNS/超时/401/403/5xx等）
+            Throwable root = e;
+            while (root.getCause() != null && root.getCause() != root) {
+                root = root.getCause();
+            }
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            String rootMsg = root.getMessage() != null ? root.getMessage() : root.getClass().getSimpleName();
+            throw new RuntimeException("图片识别失败：" + msg + (root != e ? "；root=" + rootMsg : ""), e);
         }
+    }
+
+    private boolean isRetryable(Throwable t) {
+        if (t == null) {
+            return false;
+        }
+        // 业务/鉴权错误（例如 401/403）不重试
+        String msg = t.getMessage() != null ? t.getMessage() : "";
+        if (msg.contains("401") || msg.contains("403")) {
+            return false;
+        }
+        // 其他网络类/5xx/超时等交给重试
+        return true;
     }
 
     /**

@@ -32,6 +32,7 @@ public class SeafileService {
     private String repoPassword;
 
     private final RestTemplate restTemplate;
+    private boolean enabled = true;
 
     // 支持在线预览的文件扩展名
     private static final Set<String> VIEWABLE_EXTENSIONS = Set.of(
@@ -54,29 +55,17 @@ public class SeafileService {
         System.out.println("  - repoId (raw): " + repoId);
         System.out.println("  - repoToken (raw): " + (repoToken != null ? ("长度=" + repoToken.length() + ", 值=" + (repoToken.length() > 0 ? repoToken.substring(0, Math.min(8, repoToken.length())) + "..." : "空字符串")) : "null"));
         
-        if (repoToken == null || repoToken.trim().isEmpty()) {
-            String errorMsg = String.format(
-                "Seafile repo-token 未配置！\n" +
-                "  当前值: %s\n" +
-                "  请检查:\n" +
-                "  1. application.yml 中的 seafile.repo-token 配置\n" +
-                "  2. 环境变量 SEAFILE_REPO_TOKEN 是否设置为空字符串（会覆盖默认值）\n" +
-                "  3. 确保配置格式正确: seafile.repo-token: ${SEAFILE_REPO_TOKEN:your-default-token}",
-                repoToken == null ? "null" : "空字符串"
-            );
-            System.err.println("[SeafileService] 配置错误: " + errorMsg);
-            throw new IllegalStateException(errorMsg);
+        // 联调/测试环境：允许 Seafile 不配置（禁用相关能力，不影响其他模块启动）
+        if (repoToken == null || repoToken.trim().isEmpty() ||
+            serverUrl == null || serverUrl.trim().isEmpty() ||
+            repoId == null || repoId.trim().isEmpty()) {
+            enabled = false;
+            System.err.println("[SeafileService] 配置不完整，已禁用Seafile能力（不影响其他功能启动）。");
+            System.err.println("  - 请配置 seafile.server-url / seafile.repo-id / seafile.repo-token 以启用下载/预览。");
+            return;
         }
-        if (serverUrl == null || serverUrl.trim().isEmpty()) {
-            throw new IllegalStateException(
-                "Seafile server-url 未配置！请检查 application.yml 中的 seafile.server-url 或环境变量 SEAFILE_SERVER_URL"
-            );
-        }
-        if (repoId == null || repoId.trim().isEmpty()) {
-            throw new IllegalStateException(
-                "Seafile repo-id 未配置！请检查 application.yml 中的 seafile.repo-id 或环境变量 SEAFILE_REPO_ID"
-            );
-        }
+
+        enabled = true;
         System.out.println("[SeafileService] 配置初始化成功");
     }
 
@@ -87,6 +76,9 @@ public class SeafileService {
      * @return 下载链接（临时链接，有时效性）
      */
     public String getDownloadLink(String filePath) {
+        if (!enabled) {
+            return null;
+        }
         // 1. 基础 URL
         String baseUrl = serverUrl + "/api/v2.1/via-repo-token/download-link/";
     
@@ -141,6 +133,9 @@ public class SeafileService {
      * @return 预览链接
      */
     public String generatePreviewUrl(String filePath) {
+        if (!enabled) {
+            return null;
+        }
         try {
             String encodedPath = URLEncoder.encode(filePath, StandardCharsets.UTF_8).replace("+", "%20");
             return String.format("%s/lib/%s/file%s", serverUrl, repoId, encodedPath);
@@ -180,6 +175,10 @@ public class SeafileService {
      * @return repoToken
      */
     public String getRepoToken() {
-        return repoToken;
+        return enabled ? repoToken : null;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
     }
 }

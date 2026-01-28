@@ -209,5 +209,12 @@ ENV/
 # 项目特定
 # ============================================
 
+# 本地私有配置（请勿提交，避免泄露API Key等）
+src/backend/cleaner-support-agent-backend/src/main/resources/application-local.yml
+
+# 联调测试用（不提交）
+test.png
+src/backend/cleaner-support-agent-backend/test-uploads/
+
 # 占位文件（如果需要保留，可以注释掉）
 # 占位文件（上传数据时请删除）.txt
