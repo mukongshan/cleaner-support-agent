@@ -37,6 +37,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { uploadAndRecognizeImage, sendAIMessageWithImage, ImageRecognitionResponse } from '../services/api/imageRecognition';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { ImageWithAuth } from './ImageWithAuth';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface Message {
   id: string;
@@ -1688,9 +1689,13 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
                             </div>
                             {/* 下半部分：用户补充的文字内容 */}
                             {message.content && message.content.trim() && (
-                              <p className="text-sm whitespace-pre-line">
-                                {message.content}
-                              </p>
+                              <div className="text-sm">
+                                {message.type === 'ai' ? (
+                                  <MarkdownRenderer content={message.content} />
+                                ) : (
+                                  <p className="whitespace-pre-line">{message.content}</p>
+                                )}
+                              </div>
                             )}
                           </div>
                         );
@@ -1739,9 +1744,13 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
                     ) : null}
                     {/* 纯文字消息 */}
                     {!message.image && message.content && (
-                      <p className="text-sm whitespace-pre-line">
-                        {message.content}
-                      </p>
+                      <div className="text-sm">
+                        {message.type === 'ai' ? (
+                          <MarkdownRenderer content={message.content} />
+                        ) : (
+                          <p className="whitespace-pre-line">{message.content}</p>
+                        )}
+                      </div>
                     )}
 
                     {message.citation && (
