@@ -37,3 +37,7 @@ build/
 
 
 /data
+
+### Local Configuration ###
+application-local.yml
+**/application-local.yml

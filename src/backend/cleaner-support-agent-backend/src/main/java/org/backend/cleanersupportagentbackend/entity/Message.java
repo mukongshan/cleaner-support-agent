@@ -33,6 +33,9 @@ public class Message {
     @Column(columnDefinition = "TEXT")
     private String content; // 消息内容
 
+    @Column(name = "dify_message_id", length = 100)
+    private String difyMessageId; // Dify平台消息ID映射
+
     @Column(nullable = false)
     private LocalDateTime timestamp;
 

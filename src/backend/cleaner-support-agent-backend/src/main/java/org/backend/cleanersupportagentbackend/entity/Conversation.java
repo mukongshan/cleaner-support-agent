@@ -32,6 +32,9 @@ public class Conversation {
     @Column(length = 200)
     private String title; // 会话标题（从第一条消息提取）
 
+    @Column(name = "dify_conversation_id", length = 100)
+    private String difyConversationId; // Dify平台会话ID映射
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
