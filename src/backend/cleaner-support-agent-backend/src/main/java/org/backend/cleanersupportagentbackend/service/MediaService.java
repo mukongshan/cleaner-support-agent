@@ -6,6 +6,7 @@ import org.backend.cleanersupportagentbackend.dto.MediaFileSummaryResponse;
 import org.backend.cleanersupportagentbackend.dto.UploadFileResponse;
 import org.backend.cleanersupportagentbackend.entity.MediaFile;
 import org.backend.cleanersupportagentbackend.repository.MediaFileRepository;
+import org.backend.cleanersupportagentbackend.service.support.SeafileService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

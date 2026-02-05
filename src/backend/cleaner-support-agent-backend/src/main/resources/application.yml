@@ -11,9 +11,12 @@ spring:
 
   # 数据库（默认 MySQL；也可通过环境变量覆盖为 Postgres）
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/cleaner_support?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai}
-    username: ${SPRING_DATASOURCE_USERNAME:root}
-    password: ${SPRING_DATASOURCE_PASSWORD:123456}
+    # 为避免在仓库中泄露连接信息，这里不再提供默认值，请在
+    # - 环境变量 SPRING_DATASOURCE_*
+    # - 或 application-local.yml 中进行配置
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:com.mysql.cj.jdbc.Driver}
 
   jpa:
@@ -83,17 +86,20 @@ app:
     max-file-size: ${IMAGE_MAX_SIZE:10485760}  # 10MB
     allowed-formats: ${IMAGE_ALLOWED_FORMATS:jpg,jpeg,png,webp}
   jwt:
-    # JWT密钥（生产环境请使用环境变量设置更安全的密钥）
-    secret: ${APP_JWT_SECRET:cleaner-support-agent-secret-key-for-jwt-token-generation-2024}
+    # JWT密钥（请在本地文件 application-local.yml 或环境变量中配置）
+    secret: ${APP_JWT_SECRET}
     # Token过期时间（单位：秒，默认7天）
     expiration: ${APP_JWT_EXPIRATION:604800}
 
 # Seafile 配置
 seafile:
-  server-url: ${SEAFILE_SERVER_URL:https://box.nju.edu.cn}
-  repo-token: ${SEAFILE_REPO_TOKEN:}
-  repo-id: ${SEAFILE_REPO_ID:9136e9de-f49e-45f6-9aff-9e3abe07a257}
-  repo-password: ${SEAFILE_REPO_PASSWORD:}
+  # 为避免在仓库中泄露存储配置，这里不再提供默认值，请在
+  # - 环境变量 SEAFILE_*
+  # - 或 application-local.yml 中进行配置
+  server-url: ${SEAFILE_SERVER_URL}
+  repo-token: ${SEAFILE_REPO_TOKEN}
+  repo-id: ${SEAFILE_REPO_ID}
+  repo-password: ${SEAFILE_REPO_PASSWORD}
 
 ---
 spring:

@@ -5,7 +5,7 @@ import org.backend.cleanersupportagentbackend.controller.ApiResponse;
 import org.backend.cleanersupportagentbackend.dto.ImageRecognitionBase64Request;
 import org.backend.cleanersupportagentbackend.dto.ImageRecognitionHistoryResponse;
 import org.backend.cleanersupportagentbackend.dto.ImageRecognitionResponse;
-import org.backend.cleanersupportagentbackend.service.ImageRecognitionService;
+import org.backend.cleanersupportagentbackend.service.support.ImageRecognitionService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;

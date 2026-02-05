@@ -1,4 +1,4 @@
-package org.backend.cleanersupportagentbackend.service;
+package org.backend.cleanersupportagentbackend.service.support;
 
 import org.backend.cleanersupportagentbackend.dto.ImageRecognitionHistoryResponse;
 import org.backend.cleanersupportagentbackend.dto.ImageRecognitionResponse;
@@ -6,6 +6,8 @@ import org.backend.cleanersupportagentbackend.entity.ImageRecognition;
 import org.backend.cleanersupportagentbackend.entity.RecognitionStatus;
 import org.backend.cleanersupportagentbackend.entity.User;
 import org.backend.cleanersupportagentbackend.repository.ImageRecognitionRepository;
+import org.backend.cleanersupportagentbackend.service.UserService;
+import org.backend.cleanersupportagentbackend.service.client.QwenVLClient;
 import org.backend.cleanersupportagentbackend.util.IdGenerator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;

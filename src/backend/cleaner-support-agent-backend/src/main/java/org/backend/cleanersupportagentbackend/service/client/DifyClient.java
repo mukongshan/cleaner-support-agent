@@ -1,4 +1,4 @@
-package org.backend.cleanersupportagentbackend.service;
+package org.backend.cleanersupportagentbackend.service.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.backend.cleanersupportagentbackend.config.DifyConfig;

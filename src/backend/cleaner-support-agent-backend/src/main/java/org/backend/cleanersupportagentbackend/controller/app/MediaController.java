@@ -9,7 +9,7 @@ import org.backend.cleanersupportagentbackend.dto.UploadFileResponse;
 import org.backend.cleanersupportagentbackend.entity.MediaFile;
 import org.backend.cleanersupportagentbackend.repository.MediaFileRepository;
 import org.backend.cleanersupportagentbackend.service.MediaService;
-import org.backend.cleanersupportagentbackend.service.SeafileService;
+import org.backend.cleanersupportagentbackend.service.support.SeafileService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

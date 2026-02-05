@@ -14,6 +14,8 @@ import org.backend.cleanersupportagentbackend.entity.Message;
 import org.backend.cleanersupportagentbackend.entity.User;
 import org.backend.cleanersupportagentbackend.repository.ConversationRepository;
 import org.backend.cleanersupportagentbackend.repository.MessageRepository;
+import org.backend.cleanersupportagentbackend.service.client.DifyClient;
+import org.backend.cleanersupportagentbackend.service.support.ImageRecognitionService;
 import org.backend.cleanersupportagentbackend.util.IdGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,19 +47,22 @@ public class AiService {
     private final DifyClient difyClient;
     private final DifyConfig difyConfig;
     private final ObjectMapper objectMapper;
+    private final ImageRecognitionService imageRecognitionService;
 
     public AiService(ConversationRepository conversationRepository,
                      MessageRepository messageRepository,
                      @Lazy UserService userService,
                      DifyClient difyClient,
                      DifyConfig difyConfig,
-                     ObjectMapper objectMapper) {
+                     ObjectMapper objectMapper,
+                     ImageRecognitionService imageRecognitionService) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
         this.userService = userService;
         this.difyClient = difyClient;
         this.difyConfig = difyConfig;
         this.objectMapper = objectMapper;
+        this.imageRecognitionService = imageRecognitionService;
     }
 
     /**
