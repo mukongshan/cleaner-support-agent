@@ -43,6 +43,13 @@ public class ImageRecognition {
     @Builder.Default
     private RecognitionStatus status = RecognitionStatus.pending; // 识别状态
 
+    /**
+     * 关联的媒体文件业务ID（MediaFile.fileId）
+     * 通过 MediaFile 统一管理图片的存储路径与访问方式（LOCAL / SEAFILE / OSS）
+     */
+    @Column(name = "media_file_id", length = 50)
+    private String mediaFileId;
+
     @Column(length = 500)
     private String errorMessage; // 错误信息（识别失败时）
 

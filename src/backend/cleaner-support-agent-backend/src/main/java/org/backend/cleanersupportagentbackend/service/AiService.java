@@ -48,6 +48,7 @@ public class AiService {
     private final DifyConfig difyConfig;
     private final ObjectMapper objectMapper;
     private final ImageRecognitionService imageRecognitionService;
+    private final MediaService mediaService;
 
     public AiService(ConversationRepository conversationRepository,
                      MessageRepository messageRepository,
@@ -55,7 +56,8 @@ public class AiService {
                      DifyClient difyClient,
                      DifyConfig difyConfig,
                      ObjectMapper objectMapper,
-                     ImageRecognitionService imageRecognitionService) {
+                     ImageRecognitionService imageRecognitionService,
+                     MediaService mediaService) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
         this.userService = userService;
@@ -63,6 +65,7 @@ public class AiService {
         this.difyConfig = difyConfig;
         this.objectMapper = objectMapper;
         this.imageRecognitionService = imageRecognitionService;
+        this.mediaService = mediaService;
     }
 
     /**
@@ -106,7 +109,6 @@ public class AiService {
         final AtomicReference<String> difyConversationIdRef = new AtomicReference<>(conversation.getDifyConversationId());
         final AtomicReference<String> difyMessageIdRef = new AtomicReference<>();
         final Conversation finalConversation = conversation;
-        final boolean finalIsNewConversation = isNewConversation;
 
         // 设置SSE超时和错误处理
         emitter.onTimeout(() -> {
@@ -306,11 +308,42 @@ public class AiService {
 
         List<Message> messages = messageRepository.findByConversationOrderByTimestampAsc(conversation);
         List<MessageResponse> messageResponses = messages.stream()
-                .map(msg -> MessageResponse.builder()
-                        .role(msg.getRole().name())
-                        .content(msg.getContent())
-                        .timestamp(msg.getTimestamp())
-                        .build())
+                .map(msg -> {
+                    String recognitionId = msg.getRecognitionId();
+                    String mediaFileId = null;
+                    String imageUrl = null;
+
+                    if (recognitionId != null && !recognitionId.isBlank()) {
+                        try {
+                            // 通过识别记录找到对应的媒体文件
+                            ImageRecognition recognition = imageRecognitionService.getRecognitionById(recognitionId);
+                            if (recognition.getMediaFileId() != null && !recognition.getMediaFileId().isBlank()) {
+                                mediaFileId = recognition.getMediaFileId();
+                                try {
+                                    // 通过 MediaService 获取统一的图片预览URL
+                                    imageUrl = mediaService.getFilePreviewUrl(mediaFileId);
+                                } catch (Exception e) {
+                                    logger.warn("获取媒体文件预览URL失败: mediaFileId={}, recognitionId={}",
+                                            mediaFileId, recognitionId, e);
+                                }
+                            } else if (recognition.getImageUrl() != null) {
+                                // 向后兼容：老数据仅有 imageUrl 时，直接回传该URL
+                                imageUrl = recognition.getImageUrl();
+                            }
+                        } catch (Exception e) {
+                            logger.warn("根据 recognitionId 获取图片识别记录失败: {}", recognitionId, e);
+                        }
+                    }
+
+                    return MessageResponse.builder()
+                            .role(msg.getRole().name())
+                            .content(msg.getContent())
+                            .timestamp(msg.getTimestamp())
+                            .recognitionId(recognitionId)
+                            .mediaFileId(mediaFileId)
+                            .imageUrl(imageUrl)
+                            .build();
+                })
                 .collect(Collectors.toList());
 
         return ConversationDetailResponse.builder()
@@ -361,11 +394,15 @@ public class AiService {
         
         String fullQuery = buildPromptWithImage(imageDescription, userQuery);
         
-        // 保存用户消息（包含图片描述）
+        // 为当前识别记录确保已创建并关联 MediaFile（幂等）
+        imageRecognitionService.createMediaFileFromRecognition(recognition);
+
+        // 保存用户消息（包含图片描述），通过 recognitionId 关联到图片识别记录
         Message userMessage = Message.builder()
                 .conversation(conversation)
                 .role(Message.MessageRole.user)
                 .content(fullQuery)
+                .recognitionId(recognition.getRecognitionId())
                 .timestamp(LocalDateTime.now())
                 .build();
         messageRepository.save(userMessage);

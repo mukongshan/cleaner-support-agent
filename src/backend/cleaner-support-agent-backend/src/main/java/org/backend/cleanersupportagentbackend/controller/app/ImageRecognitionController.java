@@ -33,6 +33,7 @@ public class ImageRecognitionController {
             @CurrentUserId String userId,
             @RequestParam("image") MultipartFile image) {
         try {
+            // 识别图片并在服务内部完成 ImageRecognition + MediaFile 关联
             ImageRecognitionResponse response = imageRecognitionService.recognizeImage(userId, image);
             return ResponseEntity.ok(ApiResponse.success(response));
         } catch (IllegalArgumentException e) {

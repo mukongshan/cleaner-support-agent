@@ -33,6 +33,16 @@ public class Message {
     @Column(columnDefinition = "TEXT")
     private String content; // 消息内容
 
+    /**
+     * 关联的图片识别记录ID（用于关联 ImageRecognition）
+     * 通过 ImageRecognition 可以进一步找到 MediaFile，从而获取图片访问信息
+     *
+     * 说明：一个会话可以对应多条消息，每条消息最多关联一个图片识别记录；
+     * 如果未来支持“一条消息多图”，可以演进为单独的关联表。
+     */
+    @Column(name = "recognition_id", length = 50)
+    private String recognitionId;
+
     @Column(name = "dify_message_id", length = 100)
     private String difyMessageId; // Dify平台消息ID映射
 

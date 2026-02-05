@@ -15,30 +15,34 @@ file_path_py = os.path.join(project_root, 'res', 'file_path.py')
 with open(file_path_py, 'r', encoding='utf-8') as f:
     content = f.read()
 
-# 提取 file_paths 列表
-file_paths_match = re.search(r'file_paths = \[(.*?)\]', content, re.DOTALL)
-if not file_paths_match:
-    print('Error: Could not find file_paths')
-    exit(1)
-
-file_paths_str = file_paths_match.group(1)
-# 提取所有路径（包括注释行，后面过滤）
-all_lines = file_paths_str.split('\n')
-paths = []
-for line in all_lines:
-    # 提取引号中的路径
-    matches = re.findall(r'["\']([^"\']+)["\']', line)
-    if matches and not line.strip().startswith('#'):
-        paths.extend(matches)
-
-# 提取中文映射
+# 提取中文映射（chinese_to_path_mapping 字典）
 mapping_match = re.search(r'chinese_to_path_mapping = \{(.*?)\}', content, re.DOTALL)
 chinese_mapping = {}
 if mapping_match:
     mapping_str = mapping_match.group(1)
-    # 提取中文名称到路径的映射
+    # 提取中文名称到路径的映射（结果为：path -> 中文名）
     for match in re.finditer(r'["\']([^"\']+)["\']:\s*["\']([^"\']+)["\']', mapping_str):
         chinese_mapping[match.group(2)] = match.group(1)
+
+# 提取 file_paths 列表（如果存在），否则退化为使用 chinese_to_path_mapping 中的所有路径
+file_paths_match = re.search(r'file_paths = \[(.*?)\]', content, re.DOTALL)
+paths = []
+if file_paths_match:
+    file_paths_str = file_paths_match.group(1)
+    # 提取所有路径（包括注释行，后面过滤）
+    all_lines = file_paths_str.split('\n')
+    for line in all_lines:
+        # 提取引号中的路径
+        matches = re.findall(r'["\']([^"\']+)["\']', line)
+        if matches and not line.strip().startswith('#'):
+            paths.extend(matches)
+else:
+    if chinese_mapping:
+        # 如果没有显式的 file_paths，就直接使用映射中的所有路径
+        paths = list(chinese_mapping.keys())
+    else:
+        print('Error: Could not find file_paths or chinese_to_path_mapping')
+        exit(1)
 
 # 文件类型映射
 def get_file_type(path):

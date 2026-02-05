@@ -3,9 +3,11 @@ package org.backend.cleanersupportagentbackend.service.support;
 import org.backend.cleanersupportagentbackend.dto.ImageRecognitionHistoryResponse;
 import org.backend.cleanersupportagentbackend.dto.ImageRecognitionResponse;
 import org.backend.cleanersupportagentbackend.entity.ImageRecognition;
+import org.backend.cleanersupportagentbackend.entity.MediaFile;
 import org.backend.cleanersupportagentbackend.entity.RecognitionStatus;
 import org.backend.cleanersupportagentbackend.entity.User;
 import org.backend.cleanersupportagentbackend.repository.ImageRecognitionRepository;
+import org.backend.cleanersupportagentbackend.repository.MediaFileRepository;
 import org.backend.cleanersupportagentbackend.service.UserService;
 import org.backend.cleanersupportagentbackend.service.client.QwenVLClient;
 import org.backend.cleanersupportagentbackend.util.IdGenerator;
@@ -32,6 +34,7 @@ import java.util.stream.Collectors;
 public class ImageRecognitionService {
 
     private final ImageRecognitionRepository imageRecognitionRepository;
+    private final MediaFileRepository mediaFileRepository;
     private final QwenVLClient qwenVLClient;
     private final UserService userService;
     
@@ -45,9 +48,11 @@ public class ImageRecognitionService {
     private String allowedFormats;
 
     public ImageRecognitionService(ImageRecognitionRepository imageRecognitionRepository,
+                                   MediaFileRepository mediaFileRepository,
                                    QwenVLClient qwenVLClient,
                                    UserService userService) {
         this.imageRecognitionRepository = imageRecognitionRepository;
+        this.mediaFileRepository = mediaFileRepository;
         this.qwenVLClient = qwenVLClient;
         this.userService = userService;
     }
@@ -236,6 +241,10 @@ public class ImageRecognitionService {
                 .build();
         imageRecognitionRepository.save(recognition);
 
+        // 为上传的图片创建或补充 MediaFile 记录，并关联到 ImageRecognition
+        // 统一通过 MediaFile 管理文件存储与访问方式
+        createMediaFileFromRecognition(recognition);
+
         try {
             // 更新状态为processing
             recognition.setStatus(RecognitionStatus.processing);
@@ -274,5 +283,68 @@ public class ImageRecognitionService {
                 .status(recognition.getStatus().name())
                 .createdAt(recognition.getCreatedAt())
                 .build();
+    }
+
+    /**
+     * 为上传的图片创建 MediaFile 记录，并关联到 ImageRecognition
+     * 统一通过 MediaFile 管理文件访问（LOCAL / SEAFILE / OSS）
+     *
+     * 该方法是幂等的：如果 recognition 已有关联的 mediaFileId，则直接返回对应 MediaFile。
+     */
+    @Transactional
+    public MediaFile createMediaFileFromRecognition(ImageRecognition recognition) {
+        if (recognition == null) {
+            throw new IllegalArgumentException("图片识别记录不能为空");
+        }
+
+        // 如果已经有关联的 MediaFile，直接返回
+        if (recognition.getMediaFileId() != null && !recognition.getMediaFileId().isBlank()) {
+            return mediaFileRepository.findByFileId(recognition.getMediaFileId())
+                    .orElseThrow(() -> new RuntimeException("关联的 MediaFile 不存在"));
+        }
+
+        String imagePath = recognition.getImagePath();
+        if (imagePath == null || imagePath.isBlank()) {
+            throw new IllegalStateException("图片识别记录缺少本地文件路径，无法创建 MediaFile");
+        }
+
+        // 生成文件业务ID
+        String fileId = IdGenerator.generateFileId();
+
+        // 从文件路径提取文件名
+        String filename = Paths.get(imagePath).getFileName().toString();
+
+        // 构建标题：优先使用识别描述的前50个字符，否则使用文件名
+        String title;
+        if (recognition.getDescription() != null && !recognition.getDescription().isBlank()) {
+            String desc = recognition.getDescription().trim();
+            title = desc.length() > 50 ? desc.substring(0, 50) : desc;
+        } else {
+            title = filename;
+        }
+
+        // 目前识别图片统一归类为 Image，本地文件可在线预览
+        MediaFile.FileType fileType = MediaFile.FileType.Image;
+        Boolean isViewable = true;
+
+        MediaFile mediaFile = MediaFile.builder()
+                .fileId(fileId)
+                .title(title)
+                .type(fileType)
+                .category("user_upload")               // 统一标记为用户上传
+                .seafilePath(null)                     // 当前为本地存储
+                .filePath(imagePath)                   // 使用本地文件路径
+                .storageKey(null)
+                .accessMethod(MediaFile.AccessMethod.LOCAL)
+                .isViewable(isViewable)
+                .build();
+
+        mediaFile = mediaFileRepository.save(mediaFile);
+
+        // 关联 MediaFile 到 ImageRecognition
+        recognition.setMediaFileId(mediaFile.getFileId());
+        imageRecognitionRepository.save(recognition);
+
+        return mediaFile;
     }
 }
