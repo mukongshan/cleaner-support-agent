@@ -16,6 +16,7 @@ export function ImageWithAuth({
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const blobUrlRef = React.useRef<string | null>(null);
 
   useEffect(() => {
     // 处理图片URL
@@ -39,6 +40,7 @@ export function ImageWithAuth({
     };
 
     const imageUrl = getImageUrl(src);
+    console.log('[ImageWithAuth] 开始加载图片', { src, imageUrl });
     
     // 如果URL已经是blob URL或data URL，直接使用
     if (imageUrl.startsWith('blob:') || imageUrl.startsWith('data:')) {
@@ -65,6 +67,8 @@ export function ImageWithAuth({
       })
       .then(blob => {
         const url = URL.createObjectURL(blob);
+        console.log('[ImageWithAuth] 图片加载成功', { imageUrl, blobSize: blob.size });
+        blobUrlRef.current = url;
         setBlobUrl(url);
         setLoading(false);
       })
@@ -76,8 +80,9 @@ export function ImageWithAuth({
 
     // 清理函数：组件卸载时释放 blob URL
     return () => {
-      if (blobUrl && blobUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(blobUrl);
+      if (blobUrlRef.current && blobUrlRef.current.startsWith('blob:')) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
       }
     };
   }, [src]);

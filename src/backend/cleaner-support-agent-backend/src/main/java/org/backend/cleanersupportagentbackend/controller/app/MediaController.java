@@ -9,7 +9,10 @@ import org.backend.cleanersupportagentbackend.dto.UploadFileResponse;
 import org.backend.cleanersupportagentbackend.entity.MediaFile;
 import org.backend.cleanersupportagentbackend.repository.MediaFileRepository;
 import org.backend.cleanersupportagentbackend.service.MediaService;
+import org.backend.cleanersupportagentbackend.service.support.ImageRecognitionService;
 import org.backend.cleanersupportagentbackend.service.support.SeafileService;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,11 +28,31 @@ public class MediaController {
     private final MediaService mediaService;
     private final SeafileService seafileService;
     private final MediaFileRepository mediaFileRepository;
+    private final ImageRecognitionService imageRecognitionService;
 
-    public MediaController(MediaService mediaService, SeafileService seafileService, MediaFileRepository mediaFileRepository) {
+    public MediaController(MediaService mediaService, SeafileService seafileService,
+                           MediaFileRepository mediaFileRepository, ImageRecognitionService imageRecognitionService) {
         this.mediaService = mediaService;
         this.seafileService = seafileService;
         this.mediaFileRepository = mediaFileRepository;
+        this.imageRecognitionService = imageRecognitionService;
+    }
+
+    /**
+     * 图片识别上传的图片展示（当前会话与历史会话均使用此 URL：/media/images/{filename}）
+     * GET /api/cleaner-support/v2/media/images/{filename}
+     */
+    @GetMapping(value = "/images/{filename}", produces = { MediaType.IMAGE_JPEG_VALUE, MediaType.IMAGE_PNG_VALUE, MediaType.IMAGE_GIF_VALUE, "image/webp" })
+    public ResponseEntity<?> imageContent(@PathVariable String filename) {
+        Resource resource = imageRecognitionService.getImageResourceByFilename(filename);
+        if (resource == null || !resource.exists()) {
+            return ResponseEntity.notFound().build();
+        }
+        String contentType = ImageRecognitionService.getContentTypeForFilename(filename);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .header(HttpHeaders.CACHE_CONTROL, "private, max-age=3600")
+                .body(resource);
     }
 
     @GetMapping("/files")
@@ -106,6 +129,26 @@ public class MediaController {
             return ResponseEntity.ok(ApiResponse.success(redirectInfo));
         } catch (Exception e) {
             return ResponseEntity.ok(ApiResponse.error(500, e.getMessage()));
+        }
+    }
+
+    /**
+     * 获取文件二进制内容（用于前端带鉴权请求后直接展示，如历史消息中的图片）
+     * GET /api/cleaner-support/v2/media/files/{id}/content
+     */
+    @GetMapping(value = "/files/{id}/content", produces = { MediaType.IMAGE_JPEG_VALUE, MediaType.IMAGE_PNG_VALUE, MediaType.IMAGE_GIF_VALUE, "image/webp" })
+    public ResponseEntity<?> fileContent(@PathVariable String id) {
+        try {
+            MediaService.FileContentResult result = mediaService.getFileContent(id);
+            if (result == null) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(result.getContentType()))
+                    .header(HttpHeaders.CACHE_CONTROL, "private, max-age=3600")
+                    .body(result.getResource());
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
         }
     }
 

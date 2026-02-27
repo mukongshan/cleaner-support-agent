@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -315,20 +316,16 @@ public class AiService {
 
                     if (recognitionId != null && !recognitionId.isBlank()) {
                         try {
-                            // 通过识别记录找到对应的媒体文件
                             ImageRecognition recognition = imageRecognitionService.getRecognitionById(recognitionId);
                             if (recognition.getMediaFileId() != null && !recognition.getMediaFileId().isBlank()) {
                                 mediaFileId = recognition.getMediaFileId();
-                                try {
-                                    // 通过 MediaService 获取统一的图片预览URL
-                                    imageUrl = mediaService.getFilePreviewUrl(mediaFileId);
-                                } catch (Exception e) {
-                                    logger.warn("获取媒体文件预览URL失败: mediaFileId={}, recognitionId={}",
-                                            mediaFileId, recognitionId, e);
-                                }
-                            } else if (recognition.getImageUrl() != null) {
-                                // 向后兼容：老数据仅有 imageUrl 时，直接回传该URL
+                            }
+                            // 与当前会话一致：统一使用 /media/images/{filename}，对话中（当前或历史）含图消息都用此 URL 展示
+                            if (recognition.getImageUrl() != null && !recognition.getImageUrl().isBlank()) {
                                 imageUrl = recognition.getImageUrl();
+                            } else if (recognition.getImagePath() != null && !recognition.getImagePath().isBlank()) {
+                                String filename = Paths.get(recognition.getImagePath()).getFileName().toString();
+                                imageUrl = "/api/cleaner-support/v2/media/images/" + filename;
                             }
                         } catch (Exception e) {
                             logger.warn("根据 recognitionId 获取图片识别记录失败: {}", recognitionId, e);
@@ -397,11 +394,14 @@ public class AiService {
         // 为当前识别记录确保已创建并关联 MediaFile（幂等）
         imageRecognitionService.createMediaFileFromRecognition(recognition);
 
-        // 保存用户消息（包含图片描述），通过 recognitionId 关联到图片识别记录
+        // 保存用户消息：content 只存用户问题，供历史展示；发给 LLM 的完整提示用 fullQuery
+        String contentToStore = request.getQuery() != null && !request.getQuery().isBlank()
+                ? request.getQuery()
+                : "";
         Message userMessage = Message.builder()
                 .conversation(conversation)
                 .role(Message.MessageRole.user)
-                .content(fullQuery)
+                .content(contentToStore)
                 .recognitionId(recognition.getRecognitionId())
                 .timestamp(LocalDateTime.now())
                 .build();
@@ -460,4 +460,5 @@ public class AiService {
         }
         return query.length() > 20 ? query.substring(0, 20) + "..." : query;
     }
+
 }

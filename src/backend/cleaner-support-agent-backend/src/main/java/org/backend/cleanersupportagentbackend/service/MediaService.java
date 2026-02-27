@@ -8,6 +8,9 @@ import org.backend.cleanersupportagentbackend.entity.MediaFile;
 import org.backend.cleanersupportagentbackend.repository.MediaFileRepository;
 import org.backend.cleanersupportagentbackend.service.support.SeafileService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -29,6 +32,10 @@ public class MediaService {
     
     @Value("${app.media.upload-dir:./data/uploads}")
     private String uploadDir;
+
+    /** 图片识别上传目录，与 ImageRecognitionService 一致，用于解析由识别创建的 MediaFile 相对路径 */
+    @Value("${app.image-recognition.upload-dir:./data/images}")
+    private String imageUploadDir;
 
     public MediaService(MediaFileRepository mediaFileRepository, SeafileService seafileService) {
         this.mediaFileRepository = mediaFileRepository;
@@ -172,6 +179,64 @@ public class MediaService {
         return null;
     }
     
+    /**
+     * 获取可预览文件的二进制内容（用于前端带鉴权直接请求展示图片）
+     * 仅支持 LOCAL 且为图片类型的文件。
+     *
+     * @param fileId 文件业务ID
+     * @return 文件内容与 Content-Type，不支持时返回 null
+     */
+    public FileContentResult getFileContent(String fileId) {
+        MediaFile file = mediaFileRepository.findByFileId(fileId)
+                .orElse(null);
+        if (file == null || file.getAccessMethod() != MediaFile.AccessMethod.LOCAL || file.getFilePath() == null) {
+            return null;
+        }
+        if (!isViewableByExtension(file.getFilePath())) {
+            return null;
+        }
+        Path path = Paths.get(file.getFilePath());
+        if (!path.isAbsolute()) {
+            // 由图片识别创建的 MediaFile 存于 imageUploadDir，用「目录+文件名」解析避免 path 含子路径时拼错
+            boolean isImageFromRecognition = file.getType() == MediaFile.FileType.Image
+                    && "user_upload".equals(file.getCategory());
+            if (isImageFromRecognition) {
+                path = Paths.get(imageUploadDir).resolve(path.getFileName()).normalize();
+            } else {
+                path = Paths.get(uploadDir).resolve(file.getFilePath()).normalize();
+            }
+        }
+        if (!Files.isRegularFile(path) || !Files.isReadable(path)) {
+            return null;
+        }
+        String contentType = getContentTypeFromPath(file.getFilePath());
+        return new FileContentResult(new FileSystemResource(path.toFile()), contentType);
+    }
+
+    private static String getContentTypeFromPath(String path) {
+        if (path == null) return MediaType.APPLICATION_OCTET_STREAM_VALUE;
+        String lower = path.toLowerCase();
+        if (lower.endsWith(".png")) return "image/png";
+        if (lower.endsWith(".gif")) return "image/gif";
+        if (lower.endsWith(".webp")) return "image/webp";
+        if (lower.endsWith(".svg")) return "image/svg+xml";
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+        return MediaType.APPLICATION_OCTET_STREAM_VALUE;
+    }
+
+    public static class FileContentResult {
+        private final Resource resource;
+        private final String contentType;
+
+        public FileContentResult(Resource resource, String contentType) {
+            this.resource = resource;
+            this.contentType = contentType;
+        }
+
+        public Resource getResource() { return resource; }
+        public String getContentType() { return contentType; }
+    }
+
     /**
      * 根据扩展名判断是否可预览
      */

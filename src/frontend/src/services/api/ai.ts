@@ -48,6 +48,8 @@ export interface ConversationDetail {
     role: 'user' | 'assistant';
     content: string;
     timestamp: string;
+    /** 带图用户消息的图片地址，历史记录中用于展示图片而非描述 */
+    imageUrl?: string;
   }>;
 }
 

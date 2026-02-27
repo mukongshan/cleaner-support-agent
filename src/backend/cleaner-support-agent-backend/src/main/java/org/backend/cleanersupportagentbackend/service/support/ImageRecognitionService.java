@@ -17,6 +17,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -270,6 +272,35 @@ public class ImageRecognitionService {
 
             throw new RuntimeException("图片识别失败：" + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 根据 URL 中的文件名获取图片资源（用于 GET /media/images/{filename} 展示）
+     * 仅允许读取上传目录内的文件，防止路径穿越。
+     */
+    public Resource getImageResourceByFilename(String filename) {
+        if (filename == null || filename.isBlank() || filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+            return null;
+        }
+        Path baseDir = Paths.get(uploadDir).toAbsolutePath().normalize();
+        Path filePath = baseDir.resolve(filename).normalize();
+        if (!filePath.startsWith(baseDir) || !Files.isRegularFile(filePath) || !Files.isReadable(filePath)) {
+            return null;
+        }
+        return new FileSystemResource(filePath.toFile());
+    }
+
+    /**
+     * 根据文件名推断 Content-Type
+     */
+    public static String getContentTypeForFilename(String filename) {
+        if (filename == null) return "application/octet-stream";
+        String lower = filename.toLowerCase();
+        if (lower.endsWith(".png")) return "image/png";
+        if (lower.endsWith(".gif")) return "image/gif";
+        if (lower.endsWith(".webp")) return "image/webp";
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+        return "application/octet-stream";
     }
 
     /**

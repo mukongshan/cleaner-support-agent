@@ -278,11 +278,12 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
       // 调用真实API获取会话详情
       const detail = await getConversationDetail(conversationId);
 
-      // 转换消息格式：从 API 格式转换为组件需要的格式
+      // 转换消息格式：从 API 格式转换为组件需要的格式（含 imageUrl，历史记录中显示图片不显示图片描述）
       const convertedMessages: Message[] = detail.messages.map((msg, index) => ({
         id: `${conversationId}-${index}`,
         type: msg.role === 'user' ? 'user' : 'ai',
-        content: msg.content,
+        content: msg.content ?? '',
+        image: msg.imageUrl,
         timestamp: new Date(msg.timestamp),
         rating: null
       }));
@@ -393,11 +394,12 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
           const latestConversation = conversations[0];
           const detail = await getConversationDetail(latestConversation.id);
 
-          // 转换消息格式
+          // 转换消息格式（含 imageUrl，切换到问答界面时显示图片）
           const convertedMessages: Message[] = detail.messages.map((msg, index) => ({
             id: `${latestConversation.id}-${index}`,
             type: msg.role === 'user' ? 'user' : 'ai',
-            content: msg.content,
+            content: msg.content ?? '',
+            image: msg.imageUrl,
             timestamp: new Date(msg.timestamp),
             rating: null
           }));
@@ -851,7 +853,9 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
         console.log('[ChatPage] [发送消息] 添加图文混发用户消息', {
           messageId: userMessage.id,
           contentLength: text.length,
-          hasImage: !!userMessage.image
+          hasImage: !!userMessage.image,
+          imageUrl: userMessage.image,
+          completedImageUrl: completedImages[0]?.imageUrl
         });
         setMessages(prev => [...prev, userMessage]);
       } else {
@@ -865,7 +869,9 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
         };
         console.log('[ChatPage] [发送消息] 添加仅图片用户消息', {
           messageId: userMessage.id,
-          imageUrl: userMessage.image
+          imageUrl: userMessage.image,
+          completedImageUrl: completedImages[0]?.imageUrl,
+          completedImagesCount: completedImages.length
         });
         setMessages(prev => [...prev, userMessage]);
       }
