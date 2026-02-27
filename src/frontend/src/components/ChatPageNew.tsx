@@ -37,6 +37,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { uploadAndRecognizeImage, sendAIMessageWithImage, ImageRecognitionResponse } from '../services/api/imageRecognition';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { ImageWithAuth } from './ImageWithAuth';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface Message {
   id: string;
@@ -85,6 +86,9 @@ interface AIExtractedInfo {
   keyDialogues: string[];
   images: string[];
 }
+
+// localStorage key 用于保存上次查看的会话ID
+const LAST_VIEWED_CONVERSATION_KEY = 'cleaner-support-agent-last-viewed-conversation';
 
 export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn = false, onShowLogin, onSaveInput }: ChatPageProps) {
   const { t, language } = useLanguage();
@@ -271,6 +275,20 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
     }
   };
 
+  // 保存当前会话ID到 localStorage
+  const saveLastViewedConversation = (conversationId: string | null) => {
+    if (conversationId) {
+      localStorage.setItem(LAST_VIEWED_CONVERSATION_KEY, conversationId);
+    } else {
+      localStorage.removeItem(LAST_VIEWED_CONVERSATION_KEY);
+    }
+  };
+
+  // 从 localStorage 读取上次查看的会话ID
+  const getLastViewedConversation = (): string | null => {
+    return localStorage.getItem(LAST_VIEWED_CONVERSATION_KEY);
+  };
+
   // 加载特定会话的详情（调用真实API）
   const loadConversationDetail = async (conversationId: string) => {
     setLoadingConversation(true);
@@ -291,6 +309,8 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
       setMessages(convertedMessages);
       setCurrentSessionId(conversationId);
       setIsHistoryConversation(true); // 标记为历史对话
+      // 保存当前会话ID
+      saveLastViewedConversation(conversationId);
     } catch (error) {
       console.error('加载会话详情失败:', error);
       // 出错时显示错误提示
@@ -368,7 +388,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
     }
   }, [showTicketForm]);
 
-  // 组件挂载时自动加载最近的对话
+  // 组件挂载时自动加载上次查看的对话或最近的对话
   useEffect(() => {
     const loadRecentConversation = async () => {
       // 如果有 initialMessage，则不加载历史对话
@@ -390,23 +410,41 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
         const conversations = await getConversations();
 
         if (conversations && conversations.length > 0) {
-          // 加载最近的一条对话
-          const latestConversation = conversations[0];
-          const detail = await getConversationDetail(latestConversation.id);
+          // 优先尝试加载上次查看的会话
+          const lastViewedId = getLastViewedConversation();
+          let targetConversation: Conversation | null = null;
 
-          // 转换消息格式（含 imageUrl，切换到问答界面时显示图片）
-          const convertedMessages: Message[] = detail.messages.map((msg, index) => ({
-            id: `${latestConversation.id}-${index}`,
-            type: msg.role === 'user' ? 'user' : 'ai',
-            content: msg.content ?? '',
-            image: msg.imageUrl,
-            timestamp: new Date(msg.timestamp),
-            rating: null
-          }));
+          if (lastViewedId) {
+            // 检查保存的会话ID是否在会话列表中
+            targetConversation = conversations.find(conv => conv.id === lastViewedId) || null;
+          }
 
-          setMessages(convertedMessages);
-          setCurrentSessionId(latestConversation.id);
-          setIsHistoryConversation(true);
+          // 如果找不到上次查看的会话，则使用最新的会话
+          if (!targetConversation) {
+            targetConversation = conversations[0];
+          }
+
+          // 确保 targetConversation 不为 null
+          if (targetConversation) {
+            // 加载目标会话
+            const detail = await getConversationDetail(targetConversation.id);
+
+            // 转换消息格式（含 imageUrl，切换到问答界面时显示图片）
+            const convertedMessages: Message[] = detail.messages.map((msg, index) => ({
+              id: `${targetConversation.id}-${index}`,
+              type: msg.role === 'user' ? 'user' : 'ai',
+              content: msg.content ?? '',
+              image: msg.imageUrl,
+              timestamp: new Date(msg.timestamp),
+              rating: null
+            }));
+
+            setMessages(convertedMessages);
+            setCurrentSessionId(targetConversation.id);
+            setIsHistoryConversation(true);
+            // 保存当前会话ID
+            saveLastViewedConversation(targetConversation.id);
+          }
         }
       } catch (error) {
         console.error('加载最近对话失败:', error);
@@ -1000,6 +1038,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
                 previousSessionId: currentSessionId
               });
               setCurrentSessionId(event.conversation_id);
+              saveLastViewedConversation(event.conversation_id);
               conversationIdSaved = true;
             }
 
@@ -1156,6 +1195,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
 
             // 立即保存会话ID，确保用户在同一轮对话中发送多条消息时能正确关联
             setCurrentSessionId(event.conversation_id);
+            saveLastViewedConversation(event.conversation_id);
 
             // 如果是新会话，添加到历史记录列表
             if (isNewConversation) {
@@ -1185,6 +1225,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
 
             // 保存会话ID
             setCurrentSessionId(event.conversation_id);
+            saveLastViewedConversation(event.conversation_id);
 
             // 如果是新会话，添加到历史记录列表
             if (isNewConversation) {
@@ -1356,6 +1397,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
     ]);
     // 重置会话ID，下次发送消息时将创建新会话
     setCurrentSessionId(null);
+    saveLastViewedConversation(null);
     setTicketCreated(false);
     setShowTicketPrompt(false); // 重置工单提示关闭状态
     setIsHistoryConversation(false); // 重置为非历史对话
@@ -1694,9 +1736,9 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
                             </div>
                             {/* 下半部分：用户补充的文字内容 */}
                             {message.content && message.content.trim() && (
-                              <p className="text-sm whitespace-pre-line">
-                                {message.content}
-                              </p>
+                              <div className="text-sm">
+                                <MarkdownRenderer content={message.content} />
+                              </div>
                             )}
                           </div>
                         );
@@ -1745,9 +1787,9 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
                     ) : null}
                     {/* 纯文字消息 */}
                     {!message.image && message.content && (
-                      <p className="text-sm whitespace-pre-line">
-                        {message.content}
-                      </p>
+                      <div className="text-sm">
+                        <MarkdownRenderer content={message.content} />
+                      </div>
                     )}
 
                     {message.citation && (

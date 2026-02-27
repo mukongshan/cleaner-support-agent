@@ -408,37 +408,88 @@ public class AiService {
         messageRepository.save(userMessage);
         
         // 创建SSE发射器
-        SseEmitter emitter = new SseEmitter(60000L); // 60秒超时
-        
-        // TODO: 这里应该调用Dify API并转发SSE流
-        // 目前先返回模拟响应
-        try {
-            String mockResponse = "根据图片描述：" + imageDescription.substring(0, Math.min(50, imageDescription.length())) + "...\n\n" +
-                    "这是一个基于图片识别的模拟AI回复。请配置Dify API以获取真实回复。";
-            
-            // 保存AI回复
-            Message aiMessage = Message.builder()
-                    .conversation(conversation)
-                    .role(Message.MessageRole.assistant)
-                    .content(mockResponse)
-                    .timestamp(LocalDateTime.now())
-                    .build();
-            messageRepository.save(aiMessage);
-            
-            // 发送SSE事件
-            emitter.send(SseEmitter.event()
-                    .name("message")
-                    .data("{\"event\":\"message\",\"answer\":\"" + mockResponse.replace("\"", "\\\"") + "\",\"conversation_id\":\"" + conversation.getConversationId() + "\"}"));
-            
-            emitter.send(SseEmitter.event()
-                    .name("message_end")
-                    .data("{\"event\":\"message_end\",\"metadata\":{}}"));
-            
+        SseEmitter emitter = new SseEmitter(difyConfig.getTimeout());
+
+        // 用于累积AI回复和追踪Dify ID
+        final AtomicReference<StringBuilder> fullAnswerRef = new AtomicReference<>(new StringBuilder());
+        final AtomicReference<String> difyConversationIdRef = new AtomicReference<>(conversation.getDifyConversationId());
+        final AtomicReference<String> difyMessageIdRef = new AtomicReference<>();
+        final Conversation finalConversation = conversation;
+
+        // 设置SSE超时和错误处理
+        emitter.onTimeout(() -> {
+            logger.warn("SSE connection timed out for conversation: {}", finalConversation.getConversationId());
             emitter.complete();
-        } catch (IOException e) {
-            emitter.completeWithError(e);
-        }
-        
+        });
+
+        emitter.onError(e -> {
+            logger.error("SSE error for conversation: {}", finalConversation.getConversationId(), e);
+        });
+
+        // 调用Dify API，使用包含图片描述的完整查询
+        difyClient.streamChat(
+                userId,
+                fullQuery,
+                conversation.getDifyConversationId(),
+                // onEvent: 处理Dify返回的事件
+                (DifyEvent event) -> {
+                    try {
+                        if ("message".equals(event.getEvent())) {
+                            // 累积回答内容
+                            if (event.getAnswer() != null) {
+                                fullAnswerRef.get().append(event.getAnswer());
+                            }
+
+                            // 保存Dify会话ID（首次收到时）
+                            if (event.getConversationId() != null && difyConversationIdRef.get() == null) {
+                                difyConversationIdRef.set(event.getConversationId());
+                            }
+
+                            // 保存Dify消息ID
+                            if (event.getMessageId() != null) {
+                                difyMessageIdRef.set(event.getMessageId());
+                            }
+
+                            // 转发事件到前端
+                            sendSseEvent(emitter, event, finalConversation.getConversationId());
+
+                        } else if ("message_end".equals(event.getEvent())) {
+                            // 更新Dify会话ID
+                            if (event.getConversationId() != null) {
+                                difyConversationIdRef.set(event.getConversationId());
+                            }
+
+                            // 保存AI回复到本地数据库
+                            saveAiResponse(finalConversation, fullAnswerRef.get().toString(),
+                                    difyConversationIdRef.get(), difyMessageIdRef.get());
+
+                            // 转发结束事件到前端
+                            sendSseEvent(emitter, event, finalConversation.getConversationId());
+                        }
+                    } catch (Exception e) {
+                        logger.error("Error processing Dify event", e);
+                    }
+                },
+                // onError: 错误处理
+                (Exception error) -> {
+                    logger.error("Dify API error", error);
+                    try {
+                        sendErrorEvent(emitter, error.getMessage(), finalConversation.getConversationId());
+                    } catch (Exception e) {
+                        logger.error("Error sending error event", e);
+                    }
+                    emitter.complete();
+                },
+                // onComplete: 完成处理
+                () -> {
+                    try {
+                        emitter.complete();
+                    } catch (Exception e) {
+                        logger.error("Error completing SSE emitter", e);
+                    }
+                }
+        );
+
         return emitter;
     }
     
