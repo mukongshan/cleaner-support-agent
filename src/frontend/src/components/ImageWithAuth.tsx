@@ -19,6 +19,15 @@ export function ImageWithAuth({
   const blobUrlRef = React.useRef<string | null>(null);
 
   useEffect(() => {
+    // 如果 src 为空，不加载
+    if (!src || src.trim() === '') {
+      console.log('[ImageWithAuth] src 为空，跳过加载', { src });
+      setLoading(false);
+      setError(false);
+      setBlobUrl(null);
+      return;
+    }
+
     // 处理图片URL
     const getImageUrl = (imageUrl: string): string => {
       if (!imageUrl) return '';
@@ -42,6 +51,14 @@ export function ImageWithAuth({
     const imageUrl = getImageUrl(src);
     console.log('[ImageWithAuth] 开始加载图片', { src, imageUrl });
     
+    // 如果处理后的 URL 为空，不加载
+    if (!imageUrl || imageUrl.trim() === '') {
+      console.warn('[ImageWithAuth] 处理后的 imageUrl 为空，跳过加载', { src, imageUrl });
+      setLoading(false);
+      setError(true);
+      return;
+    }
+    
     // 如果URL已经是blob URL或data URL，直接使用
     if (imageUrl.startsWith('blob:') || imageUrl.startsWith('data:')) {
       setBlobUrl(imageUrl);
@@ -49,7 +66,7 @@ export function ImageWithAuth({
       return;
     }
 
-    // 使用 fetch 获取图片（带认证头）
+    // 使用 fetch 获取图片（带认证头）- 组件挂载时立即开始加载
     const token = getToken();
     setLoading(true);
     setError(false);
