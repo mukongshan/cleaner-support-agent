@@ -18,8 +18,12 @@ import {
   Clock,
   RefreshCw,
   Loader2,
-  RotateCcw
+  RotateCcw,
+  ChevronDown,
+  Brain
 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserRole } from '../App';
 import {
@@ -32,7 +36,7 @@ import {
 } from '../services/api';
 import { getToken, API_BASE_URL } from '../services/api/config';
 import { TicketForm } from './TicketForm';
-import aiAvatar from '../assets/images/ai_avatar.png';
+// ai_avatar.png 体积过大（7MB+），改用内联 SVG 零加载延迟
 import { useLanguage } from '../contexts/LanguageContext';
 import { uploadAndRecognizeImage, sendAIMessageWithImage, ImageRecognitionResponse } from '../services/api/imageRecognition';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
@@ -84,6 +88,189 @@ interface AIExtractedInfo {
   suggestedPriority: 'low' | 'medium' | 'high';
   keyDialogues: string[];
   images: string[];
+}
+
+// ──────────────────────────────────────────────────────────
+// AI 头像（SVG，零加载延迟）
+// ──────────────────────────────────────────────────────────
+function AIAvatar({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+    >
+      <circle cx="16" cy="16" r="16" fill="url(#avatar-gradient)" />
+      <defs>
+        <linearGradient id="avatar-gradient" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#3B82F6" />
+          <stop offset="100%" stopColor="#6366F1" />
+        </linearGradient>
+      </defs>
+      {/* 天线 */}
+      <line x1="16" y1="5" x2="16" y2="9" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="16" cy="4" r="1.5" fill="white" />
+      {/* 头部 */}
+      <rect x="8" y="9" width="16" height="14" rx="3" fill="white" fillOpacity="0.9" />
+      {/* 眼睛 */}
+      <circle cx="12.5" cy="14.5" r="2" fill="url(#avatar-gradient)" />
+      <circle cx="19.5" cy="14.5" r="2" fill="url(#avatar-gradient)" />
+      <circle cx="13" cy="14" r="0.7" fill="white" />
+      <circle cx="20" cy="14" r="0.7" fill="white" />
+      {/* 嘴巴 */}
+      <path d="M12 19 Q16 21.5 20 19" stroke="url(#avatar-gradient)" strokeWidth="1.2" strokeLinecap="round" fill="none" />
+    </svg>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// 解析 AI 消息中的思考内容（<think>...</think>）
+// ──────────────────────────────────────────────────────────
+function parseMessageContent(content: string): {
+  thinking: string | null;
+  answer: string;
+  isThinkingComplete: boolean;
+} {
+  // 已完成的思考：<think>...</think>answer
+  const thinkCompleteMatch = content.match(/^<think>([\s\S]*?)<\/think>([\s\S]*)$/);
+  if (thinkCompleteMatch) {
+    return {
+      thinking: thinkCompleteMatch[1],
+      answer: thinkCompleteMatch[2].trim(),
+      isThinkingComplete: true,
+    };
+  }
+  // 思考仍在流式输出（无闭合标签）
+  if (content.startsWith('<think>')) {
+    return {
+      thinking: content.slice(7),
+      answer: '',
+      isThinkingComplete: false,
+    };
+  }
+  return { thinking: null, answer: content, isThinkingComplete: true };
+}
+
+// ──────────────────────────────────────────────────────────
+// 可折叠的「思考过程」块
+// ──────────────────────────────────────────────────────────
+function ThinkingBlock({ content, isComplete }: { content: string; isComplete: boolean }) {
+  const [isExpanded, setIsExpanded] = useState(!isComplete);
+
+  useEffect(() => {
+    if (isComplete) {
+      setIsExpanded(false);
+    }
+  }, [isComplete]);
+
+  return (
+    <div className="mb-3">
+      <button
+        onClick={() => setIsExpanded(v => !v)}
+        className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-500 transition-colors select-none"
+      >
+        <Brain className="w-3 h-3" />
+        <span>{isComplete ? '查看思考过程' : '思考中…'}</span>
+        {!isComplete && <Loader2 className="w-3 h-3 animate-spin" />}
+        <ChevronDown
+          className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? '' : '-rotate-90'}`}
+        />
+      </button>
+      {isExpanded && (
+        <div className="mt-2 pl-3 border-l-2 border-gray-100 rounded">
+          <p className="text-xs text-gray-400 whitespace-pre-wrap leading-relaxed">{content}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Markdown 渲染（仅用于 AI 回答）
+// ──────────────────────────────────────────────────────────
+function AIMarkdownContent({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        p: ({ children }) => (
+          <p className="text-sm mb-2 last:mb-0 leading-relaxed">{children}</p>
+        ),
+        strong: ({ children }) => (
+          <strong className="font-semibold text-gray-900">{children}</strong>
+        ),
+        em: ({ children }) => (
+          <em className="italic text-gray-700">{children}</em>
+        ),
+        ul: ({ children }) => (
+          <ul className="text-sm list-disc pl-4 mb-2 space-y-0.5">{children}</ul>
+        ),
+        ol: ({ children }) => (
+          <ol className="text-sm list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>
+        ),
+        li: ({ children }) => (
+          <li className="leading-relaxed">{children}</li>
+        ),
+        h1: ({ children }) => (
+          <h1 className="text-base font-bold mb-2 mt-1 text-gray-900">{children}</h1>
+        ),
+        h2: ({ children }) => (
+          <h2 className="text-sm font-bold mb-1.5 mt-1 text-gray-900">{children}</h2>
+        ),
+        h3: ({ children }) => (
+          <h3 className="text-sm font-semibold mb-1 mt-1 text-gray-800">{children}</h3>
+        ),
+        pre: ({ children }) => (
+          <pre className="bg-gray-100 p-3 rounded-lg text-xs font-mono overflow-x-auto mb-2 mt-1">
+            {children}
+          </pre>
+        ),
+        code: ({ className, children }) => {
+          const isBlock = !!className;
+          if (isBlock) {
+            return <code className={className}>{children}</code>;
+          }
+          return (
+            <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono text-gray-800">
+              {children}
+            </code>
+          );
+        },
+        blockquote: ({ children }) => (
+          <blockquote className="border-l-2 border-gray-300 pl-3 italic text-gray-600 mb-2">
+            {children}
+          </blockquote>
+        ),
+        hr: () => <hr className="my-2 border-gray-200" />,
+        a: ({ href, children }) => (
+          <a
+            href={href}
+            className="text-blue-600 hover:underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {children}
+          </a>
+        ),
+        table: ({ children }) => (
+          <div className="overflow-x-auto mb-2">
+            <table className="text-xs border-collapse w-full">{children}</table>
+          </div>
+        ),
+        th: ({ children }) => (
+          <th className="border border-gray-300 px-2 py-1 bg-gray-50 font-semibold text-left">
+            {children}
+          </th>
+        ),
+        td: ({ children }) => (
+          <td className="border border-gray-300 px-2 py-1">{children}</td>
+        ),
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
 }
 
 export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn = false, onShowLogin, onSaveInput }: ChatPageProps) {
@@ -1609,6 +1796,8 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
             // 检查是否是最后一条AI消息
             const lastAIMessageIndex = messages.map((m, i) => m.type === 'ai' ? i : -1).filter(i => i !== -1).pop();
             const isLastAI = message.type === 'ai' && index === lastAIMessageIndex && !aiThinking;
+            // 是否是当前正在流式输出的消息
+            const isStreamingMessage = message.type === 'ai' && index === lastAIMessageIndex && aiThinking;
 
             return (
               <motion.div
@@ -1625,14 +1814,14 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
               >
                 <div className={`max-w-[80%]`}>
                   {message.type === 'ai' && (
-                    <motion.img
+                    <motion.div
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                      src={aiAvatar}
-                      alt="AI Avatar"
-                      className="w-8 h-8 rounded-full mb-2 object-cover"
-                    />
+                      className="w-8 h-8 mb-2"
+                    >
+                      <AIAvatar className="w-8 h-8" />
+                    </motion.div>
                   )}
 
                   <motion.div
@@ -1743,11 +1932,36 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
                         );
                       })()
                     ) : null}
-                    {/* 纯文字消息 */}
+                    {/* 文字消息 */}
                     {!message.image && message.content && (
-                      <p className="text-sm whitespace-pre-line">
-                        {message.content}
-                      </p>
+                      message.type === 'ai' ? (() => {
+                        const { thinking, answer, isThinkingComplete } = parseMessageContent(message.content);
+                        return (
+                          <div>
+                            {thinking !== null && (
+                              <ThinkingBlock content={thinking} isComplete={isThinkingComplete} />
+                            )}
+                            {answer && (
+                              <AIMarkdownContent content={answer} />
+                            )}
+                            {/* 思考仍在进行、无answer时显示等待提示 */}
+                            {!answer && thinking === null && (
+                              <p className="text-sm text-gray-500">{message.content}</p>
+                            )}
+                          </div>
+                        );
+                      })() : (
+                        <p className="text-sm whitespace-pre-line">
+                          {message.content}
+                        </p>
+                      )
+                    )}
+
+                    {/* 流式输出时显示加载动画（在气泡内部） */}
+                    {isStreamingMessage && (
+                      <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400">
+                        <Loader2 className="w-3 h-3 animate-spin text-blue-400" />
+                      </div>
                     )}
 
                     {message.citation && (
@@ -1873,7 +2087,8 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
           })
         )}
 
-        {aiThinking && (
+        {/* 独立思考气泡：仅在 AI 还未开始输出任何内容时显示 */}
+        {aiThinking && messages[messages.length - 1]?.type !== 'ai' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1882,51 +2097,23 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
             className="flex justify-start"
           >
             <div className="max-w-[80%]">
-              <motion.img
+              <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                src={aiAvatar}
-                alt="AI Avatar"
-                className="w-8 h-8 rounded-full mb-2 object-cover"
-              />
+                className="w-8 h-8 mb-2"
+              >
+                <AIAvatar className="w-8 h-8" />
+              </motion.div>
               <motion.div
                 initial={{ scale: 0.95 }}
                 animate={{ scale: 1 }}
                 transition={{ duration: 0.2 }}
                 className="bg-white rounded-2xl rounded-tl-sm shadow-sm px-4 py-3"
               >
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="flex items-center gap-2 text-sm text-gray-600 mb-2"
-                >
-                  <Loader className="w-4 h-4 animate-spin" />
-                  <motion.span
-                    key={thinkingStep}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    {thinkingSteps[thinkingStep]}
-                  </motion.span>
-                </motion.div>
-                <div className="flex gap-1">
-                  {[0, 1, 2].map((i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ scale: 0 }}
-                      animate={{ scale: [0, 1, 0] }}
-                      transition={{
-                        duration: 1.5,
-                        repeat: Infinity,
-                        delay: i * 0.2,
-                        ease: 'easeInOut'
-                      }}
-                      className="w-2 h-2 bg-gray-400 rounded-full"
-                    />
-                  ))}
+                <div className="flex items-center gap-2 text-sm text-gray-400">
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+                  <span>正在思考…</span>
                 </div>
               </motion.div>
             </div>
