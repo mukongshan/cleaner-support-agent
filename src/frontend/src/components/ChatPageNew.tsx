@@ -20,7 +20,8 @@ import {
   Loader2,
   RotateCcw,
   ChevronDown,
-  Brain
+  Brain,
+  Square
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -28,6 +29,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { UserRole } from '../App';
 import {
   sendAIMessage,
+  stopAIMessage,
   getConversations,
   getConversationDetail,
   createTicket,
@@ -343,6 +345,10 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const prevMessagesLength = useRef(0);
+
+  // 停止生成相关：保存取消函数和当前活跃的 conversationId
+  const cancelChatRef = useRef<(() => void) | null>(null);
+  const activeConvIdRef = useRef<string | null>(null);
 
   const thinkingSteps = [
     t('ai_thinking'),
@@ -1295,8 +1301,8 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
     console.log('当前会话ID:', currentSessionId);
     console.log('是否新会话:', isNewConversation);
 
-    // 调用真实的 AI API
-    sendAIMessage(
+    // 调用真实的 AI API，保存取消函数以供停止按钮使用
+    cancelChatRef.current = sendAIMessage(
       requestParams,
       // onMessage: 收到消息片段
       (event) => {
@@ -1339,6 +1345,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
           // conversation_id 可能在 message 事件中就已经返回，需要立即保存
           if (event.conversation_id && !conversationIdSaved) {
             conversationIdSaved = true;
+            activeConvIdRef.current = event.conversation_id; // 供停止按钮使用
             console.log('保存 conversation_id:', event.conversation_id);
 
             // 立即保存会话ID，确保用户在同一轮对话中发送多条消息时能正确关联
@@ -1416,11 +1423,13 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
           }
         }
       },
-      // onError: 错误处理
+      // onError: 错误处理（AbortError 由 handleStopGeneration 处理，不在此显示错误气泡）
       (error) => {
         console.error('AI 对话错误:', error);
         clearInterval(stepInterval);
         setAiThinking(false);
+        cancelChatRef.current = null;
+        activeConvIdRef.current = null;
 
         // 显示详细的错误消息
         const errorMessage = error.message || '未知错误';
@@ -1438,11 +1447,42 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
       () => {
         clearInterval(stepInterval);
         setAiThinking(false);
+        cancelChatRef.current = null;
+        activeConvIdRef.current = null;
       }
     );
+  };
 
-    // cancelRequest 可用于取消请求，例如用户快速发送新消息或组件卸载时
-    // 当前未使用，但保留以便将来需要时使用
+  // 停止正在生成的 AI 回复
+  const handleStopGeneration = async () => {
+    // 1. 中断前端 SSE 连接
+    if (cancelChatRef.current) {
+      cancelChatRef.current();
+      cancelChatRef.current = null;
+    }
+
+    // 2. 通知后端停止 Dify 流（有 conversationId 时才调用）
+    const convId = activeConvIdRef.current;
+    if (convId) {
+      activeConvIdRef.current = null;
+      try {
+        await stopAIMessage(convId);
+      } catch (e) {
+        console.warn('停止生成接口调用失败（可能已自然结束）', e);
+      }
+    }
+
+    // 3. 在最后一条 AI 消息末尾追加已停止标记
+    setMessages(prev => {
+      const lastAiIdx = [...prev].map((m, i) => (m.type === 'ai' ? i : -1)).filter(i => i !== -1).pop();
+      if (lastAiIdx === undefined) return prev;
+      return prev.map((m, i) =>
+        i === lastAiIdx ? { ...m, content: m.content + '\n\n*[已停止生成]*' } : m
+      );
+    });
+
+    // 4. 恢复 UI 状态
+    setAiThinking(false);
   };
 
   // 处理初始消息
@@ -2564,34 +2604,56 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
             style={{ display: 'none' }}
           />
 
-          {/* 4. 发送按钮 - 固定 40x40 */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => handleSendMessage(inputText)}
-                disabled={!canSend()}
-                className="haptic-feedback flex-shrink-0"
-                style={{
-                  height: '40px',
-                  width: '40px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: '8px',
-                  backgroundColor: canSend() ? '#2563eb' : '#e5e7eb',
-                  cursor: canSend() ? 'pointer' : 'not-allowed',
-                  transition: 'background-color 0.2s'
-                }}
-              >
-                <Send style={{ width: '20px', height: '20px', color: canSend() ? '#fff' : '#9ca3af' }} />
-              </button>
-            </TooltipTrigger>
-            {!canSend() && getSendButtonTooltip() && (
-              <TooltipContent side="top" className="bg-gray-900 text-white text-xs">
-                {getSendButtonTooltip()}
-              </TooltipContent>
-            )}
-          </Tooltip>
+          {/* 4. 发送/停止按钮 - 固定 40x40 */}
+          {aiThinking ? (
+            /* 生成中：显示停止按钮 */
+            <button
+              onClick={handleStopGeneration}
+              className="haptic-feedback flex-shrink-0"
+              style={{
+                height: '40px',
+                width: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '8px',
+                backgroundColor: '#2563eb',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s'
+              }}
+            >
+              <Square style={{ width: '16px', height: '16px', color: '#fff', fill: '#fff' }} />
+            </button>
+          ) : (
+            /* 空闲中：显示发送按钮 */
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => handleSendMessage(inputText)}
+                  disabled={!canSend()}
+                  className="haptic-feedback flex-shrink-0"
+                  style={{
+                    height: '40px',
+                    width: '40px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '8px',
+                    backgroundColor: canSend() ? '#2563eb' : '#e5e7eb',
+                    cursor: canSend() ? 'pointer' : 'not-allowed',
+                    transition: 'background-color 0.2s'
+                  }}
+                >
+                  <Send style={{ width: '20px', height: '20px', color: canSend() ? '#fff' : '#9ca3af' }} />
+                </button>
+              </TooltipTrigger>
+              {!canSend() && getSendButtonTooltip() && (
+                <TooltipContent side="top" className="bg-gray-900 text-white text-xs">
+                  {getSendButtonTooltip()}
+                </TooltipContent>
+              )}
+            </Tooltip>
+          )}
         </div>
       </div>
     </div>
