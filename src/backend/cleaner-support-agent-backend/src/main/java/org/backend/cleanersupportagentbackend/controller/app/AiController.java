@@ -58,4 +58,18 @@ public class AiController {
     public SseEmitter chatWithImage(@CurrentUserId String userId, @RequestBody ChatWithImageRequest request) {
         return aiService.chatWithImage(userId, request);
     }
+
+    /**
+     * 主动终止指定会话的流式生成。
+     * 前端在用户点击"停止"时调用，后端立即中断对 Dify 的 HTTP 连接。
+     */
+    @PostMapping("/conversations/{conversationId}/abort")
+    public ResponseEntity<ApiResponse<Void>> abortChat(@PathVariable String conversationId) {
+        try {
+            aiService.stopChat(conversationId);
+            return ResponseEntity.ok(ApiResponse.success(null));
+        } catch (Exception e) {
+            return ResponseEntity.ok(ApiResponse.error(500, e.getMessage()));
+        }
+    }
 }

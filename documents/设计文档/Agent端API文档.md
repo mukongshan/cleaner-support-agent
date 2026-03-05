@@ -1,121 +1,46 @@
-工作流编排对话型应用 API
-==============
+# 工作流编排对话型应用 API
 
 对话应用支持会话持久化，可将之前的聊天记录作为上下文进行回答，可适用于聊天/客服 AI 等。
 
-### 基础 URL
-
-### Code
+## 基础 URL
 
 ```
 http://dify.seec.seecoder.cn/v1
 ```
 
-CopyCopied!
-
-### 鉴权
+## 鉴权
 
 Service API 使用 `API-Key` 进行鉴权。
-***强烈建议开发者把 `API-Key` 放在后端存储，而非分享或者放在客户端存储，以免 `API-Key` 泄露，导致财产损失。***
+
+**强烈建议开发者把 `API-Key` 放在后端存储，而非分享或者放在客户端存储，以免 `API-Key` 泄露，导致财产损失。**
+
 所有 API 请求都应在 **`Authorization`** HTTP Header 中包含您的 `API-Key`，如下所示：
 
-### Code
-
 ```
+Authorization: Bearer {API_KEY}
 ```
-  Authorization: Bearer {API_KEY}
-```
-```
-
-CopyCopied!
 
 ---
 
 
 
-POST/chat-messages
+## 发送对话消息 (POST /chat-messages)
 
-[发送对话消息](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#Create-Chat-Message)
-------------------------------------------------------------------------------------------------------------
+参考：[发送对话消息](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#Create-Chat-Message)
 
 创建会话消息。
 
 ### Request Body
 
-* Name
-  :   `query`
-
-  Type
-  :   string
-
-  Description
-  :   用户输入/提问内容。
-* Name
-  :   `inputs`
-
-  Type
-  :   object
-
-  Description
-  :   允许传入 App 定义的各变量值。
-      inputs 参数包含了多组键值对（Key/Value pairs），每组的键对应一个特定变量，每组的值则是该变量的具体值。
-      如果变量是文件类型，请指定一个包含以下 `files` 中所述键的对象。
-      默认 `{}`
-* Name
-  :   `response_mode`
-
-  Type
-  :   string
-
-  Description
-  :   + `streaming` 流式模式（推荐）。基于 SSE（**[Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)**）实现类似打字机输出方式的流式返回。
-      + `blocking` 阻塞模式，等待执行完毕后返回结果。（请求若流程较长可能会被中断）。
-        *由于 Cloudflare 限制，请求会在 100 秒超时无返回后中断。*
-* Name
-  :   `user`
-
-  Type
-  :   string
-
-  Description
-  :   用户标识，用于定义终端用户的身份，方便检索、统计。
-      由开发者定义规则，需保证用户标识在应用内唯一。服务 API 不会共享 WebApp 创建的对话。
-* Name
-  :   `conversation_id`
-
-  Type
-  :   string
-
-  Description
-  :   （选填）会话 ID，需要基于之前的聊天记录继续对话，必须传之前消息的 conversation\_id。
-* Name
-  :   `files`
-
-  Type
-  :   array[object]
-
-  Description
-  :   文件列表，适用于传入文件结合文本理解并回答问题，仅当模型支持 Vision 能力时可用。
-
-      + `type` (string) 支持类型：
-        - `document` 具体类型包含：'TXT', 'MD', 'MARKDOWN', 'PDF', 'HTML', 'XLSX', 'XLS', 'DOCX', 'CSV', 'EML', 'MSG', 'PPTX', 'PPT', 'XML', 'EPUB'
-        - `image` 具体类型包含：'JPG', 'JPEG', 'PNG', 'GIF', 'WEBP', 'SVG'
-        - `audio` 具体类型包含：'MP3', 'M4A', 'WAV', 'WEBM', 'AMR'
-        - `video` 具体类型包含：'MP4', 'MOV', 'MPEG', 'MPGA'
-        - `custom` 具体类型包含：其他文件类型
-      + `transfer_method` (string) 传递方式:
-        - `remote_url`: 图片地址。
-        - `local_file`: 上传文件。
-      + `url` 图片地址。（仅当传递方式为 `remote_url` 时）。
-      + `upload_file_id` 上传文件 ID。（仅当传递方式为 `local_file` 时）。
-* Name
-  :   `auto_generate_name`
-
-  Type
-  :   bool
-
-  Description
-  :   （选填）自动生成标题，默认 `true`。 若设置为 `false`，则可通过调用会话重命名接口并设置 `auto_generate` 为 `true` 实现异步生成标题。
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `query` | string | 用户输入/提问内容。 |
+| `inputs` | object | 允许传入 App 定义的各变量值。inputs 参数包含了多组键值对（Key/Value pairs），每组的键对应一个特定变量，每组的值则是该变量的具体值。如果变量是文件类型，请指定一个包含以下 `files` 中所述键的对象。默认 `{}` |
+| `response_mode` | string | `streaming` 流式模式（推荐），基于 SSE 实现类似打字机输出方式的流式返回；`blocking` 阻塞模式，等待执行完毕后返回结果。（请求若流程较长可能会被中断。由于 Cloudflare 限制，请求会在 100 秒超时无返回后中断。） |
+| `user` | string | 用户标识，用于定义终端用户的身份，方便检索、统计。由开发者定义规则，需保证用户标识在应用内唯一。服务 API 不会共享 WebApp 创建的对话。 |
+| `conversation_id` | string | （选填）会话 ID，需要基于之前的聊天记录继续对话，必须传之前消息的 conversation_id。 |
+| `files` | array[object] | 文件列表，适用于传入文件结合文本理解并回答问题，仅当模型支持 Vision 能力时可用。`type` (string)：支持类型 document/image/audio/video/custom；`transfer_method` (string)：传递方式 remote_url 或 local_file；`url`：图片地址（仅当 transfer_method 为 remote_url）；`upload_file_id`：上传文件 ID（仅当 transfer_method 为 local_file）。 |
+| `auto_generate_name` | bool | （选填）自动生成标题，默认 `true`。若设置为 `false`，则可通过调用会话重命名接口并设置 `auto_generate` 为 `true` 实现异步生成标题。 |
 
 ### Response
 
@@ -144,12 +69,8 @@ POST/chat-messages
 每个流式块均为 data: 开头，块之间以 \n\n 即两个换行符分隔，如下所示：
 
 ```
-```
 data: {"event": "message", "task_id": "900bbd43-dc0b-4383-a372-aa6e6c414227", "id": "663c5084-a254-4040-8ad3-51f2a3c1a77c", "answer": "Hi", "created_at": 1705398420}\n\n
 ```
-```
-
-CopyCopied!
 
 流式块中根据 event 不同，结构也不同：
 
@@ -267,9 +188,7 @@ CopyCopied!
 
 ### Request
 
-POST
-
-/chat-messages
+**POST** `/chat-messages`
 
 ```
 curl -X POST 'http://dify.seec.seecoder.cn/v1/chat-messages' \
@@ -291,13 +210,10 @@ curl -X POST 'http://dify.seec.seecoder.cn/v1/chat-messages' \
 }'
 ```
 
-CopyCopied!
-
 ### 阻塞模式
 
 ### Response
 
-```
 ```
 {
     "event": "message",
@@ -338,15 +254,11 @@ CopyCopied!
     "created_at": 1705407629
 }
 ```
-```
-
-CopyCopied!
 
 ### 流式模式
 
 ### Response
 
-```
 ```
   data: {"event": "workflow_started", "task_id": "5ad4cb98-f0c7-4085-b384-88c403be6290", "workflow_run_id": "5ad498-f0c7-4085-b384-88cbe6290", "data": {"id": "5ad498-f0c7-4085-b384-88cbe6290", "workflow_id": "dfjasklfjdslag", "created_at": 1679586595}}
   data: {"event": "node_started", "task_id": "5ad4cb98-f0c7-4085-b384-88c403be6290", "workflow_run_id": "5ad498-f0c7-4085-b384-88cbe6290", "data": {"id": "5ad498-f0c7-4085-b384-88cbe6290", "node_id": "dfjasklfjdslag", "node_type": "start", "title": "Start", "index": 0, "predecessor_node_id": "fdljewklfklgejlglsd", "inputs": {}, "created_at": 1679586595}}
@@ -362,18 +274,15 @@ CopyCopied!
   data: {"event": "tts_message", "conversation_id": "23dd85f3-1a41-4ea0-b7a9-062734ccfaf9", "message_id": "a8bdc41c-13b2-4c18-bfd9-054b9803038c", "created_at": 1721205487, "task_id": "3bf8a0bb-e73b-4690-9e66-4e429bad8ee7", "audio": "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"}
   data: {"event": "tts_message_end", "conversation_id": "23dd85f3-1a41-4ea0-b7a9-062734ccfaf9", "message_id": "a8bdc41c-13b2-4c18-bfd9-054b9803038c", "created_at": 1721205487, "task_id": "3bf8a0bb-e73b-4690-9e66-4e429bad8ee7", "audio": ""}
 ```
-```
-
-CopyCopied!
 
 ---
 
 
 
-POST/files/upload
+## 上传文件 (POST /files/upload)
 
-[上传文件](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#files-upload)
----------------------------------------------------------------------------------------------------
+参考：[上传文件](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#files-upload)
+---
 
 上传文件并在发送消息时使用，可实现图文多模态理解。
 支持您的应用程序所支持的所有格式。
@@ -426,9 +335,7 @@ POST/files/upload
 
 ### Request
 
-POST
-
-/files/upload
+**POST** `/files/upload`
 
 ```
 curl -X POST 'http://dify.seec.seecoder.cn/v1/files/upload' \
@@ -437,11 +344,8 @@ curl -X POST 'http://dify.seec.seecoder.cn/v1/files/upload' \
 --form 'user=abc-123'
 ```
 
-CopyCopied!
-
 ### Response
 
-```
 ```
 {
   "id": "72fa9618-8f89-4a37-9b33-7e1178a24a67",
@@ -453,18 +357,15 @@ CopyCopied!
   "created_at": 1577836800,
 }
 ```
-```
-
-CopyCopied!
 
 ---
 
 
 
-POST/chat-messages/:task\_id/stop
+## 停止响应 (POST /chat-messages/:task_id/stop)
 
-[停止响应](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#Stop)
--------------------------------------------------------------------------------------------
+参考：[停止响应](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#Stop)
+---
 
 仅支持流式模式。
 
@@ -483,9 +384,7 @@ POST/chat-messages/:task\_id/stop
 
 ### Request
 
-POST
-
-/chat-messages/:task\_id/stop
+**POST** `/chat-messages/:task_id/stop`
 
 ```
 curl -X POST 'http://dify.seec.seecoder.cn/v1/chat-messages/:task_id/stop' \
@@ -494,28 +393,22 @@ curl -X POST 'http://dify.seec.seecoder.cn/v1/chat-messages/:task_id/stop' \
 --data-raw '{ "user": "abc-123"}'
 ```
 
-CopyCopied!
-
 ### Response
 
-```
 ```
 {
   "result": "success"
 }
 ```
-```
-
-CopyCopied!
 
 ---
 
 
 
-POST/messages/:message\_id/feedbacks
+## 消息反馈/点赞 (POST /messages/:message_id/feedbacks)
 
-[消息反馈（点赞）](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#feedbacks)
-----------------------------------------------------------------------------------------------------
+参考：[消息反馈（点赞）](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#feedbacks)
+----
 
 消息终端用户反馈、点赞，方便应用开发者优化输出预期。
 
@@ -563,9 +456,7 @@ POST/messages/:message\_id/feedbacks
 
 ### Request
 
-POST
-
-/messages/:message\_id/feedbacks
+**POST** `/messages/:message_id/feedbacks`
 
 ```
 curl -X POST 'http://dify.seec.seecoder.cn/v1/messages/:message_id/feedbacks \
@@ -578,28 +469,22 @@ curl -X POST 'http://dify.seec.seecoder.cn/v1/messages/:message_id/feedbacks \
 }'
 ```
 
-CopyCopied!
-
 ### Response
 
-```
 ```
 {
   "result": "success"
 }
 ```
-```
-
-CopyCopied!
 
 ---
 
 
 
-GET/app/feedbacks
+## 获取 APP 消息点赞和反馈 (GET /app/feedbacks)
 
-[获取APP的消息点赞和反馈](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#app-feedbacks)
--------------------------------------------------------------------------------------------------------------
+参考：[获取APP的消息点赞和反馈](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#app-feedbacks)
+-------------
 
 获取应用的终端用户反馈、点赞。
 
@@ -629,19 +514,14 @@ GET/app/feedbacks
 
 ### Request
 
-GET
-
-/app/feedbacks
+**GET** `/app/feedbacks`
 
 ```
 curl -X GET 'http://dify.seec.seecoder.cn/v1/app/feedbacks?page=1&limit=20'
 ```
 
-CopyCopied!
-
 ### Response
 
-```
 ```
     {
     "data": [
@@ -661,18 +541,15 @@ CopyCopied!
     ]
     }
 ```
-```
-
-CopyCopied!
 
 ---
 
 
 
-GET/messages/{message\_id}/suggested
+## 获取下一轮建议问题列表 (GET /messages/{message_id}/suggested)
 
-[获取下一轮建议问题列表](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#suggested)
--------------------------------------------------------------------------------------------------------
+参考：[获取下一轮建议问题列表](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#suggested)
+-------
 
 获取下一轮建议问题列表。
 
@@ -700,9 +577,7 @@ GET/messages/{message\_id}/suggested
 
 ### Request
 
-GET
-
-/messages/{message\_id}/suggested
+**GET** `/messages/{message_id}/suggested`
 
 ```
 curl --location --request GET 'http://dify.seec.seecoder.cn/v1/messages/{message_id}/suggested?user=abc-123 \
@@ -710,11 +585,8 @@ curl --location --request GET 'http://dify.seec.seecoder.cn/v1/messages/{message
 --header 'Content-Type: application/json'
 ```
 
-CopyCopied!
-
 ### Response
 
-```
 ```
 {
   "result": "success",
@@ -725,9 +597,6 @@ CopyCopied!
     ]
 }
 ```
-```
-
-CopyCopied!
 
 ---
 
@@ -737,10 +606,10 @@ CopyCopied!
 
 
 
-GET/messages
+## 获取会话历史消息 (GET /messages)
 
-[获取会话历史消息](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#messages)
----------------------------------------------------------------------------------------------------
+参考：[获取会话历史消息](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#messages)
+---
 
 滚动加载形式返回历史聊天记录，第一页返回最新 `limit` 条，即：倒序返回。
 
@@ -803,22 +672,17 @@ GET/messages
 
 ### Request
 
-GET
-
-/messages
+**GET** `/messages`
 
 ```
 curl -X GET 'http://dify.seec.seecoder.cn/v1/messages?user=abc-123&conversation_id=' \
 --header 'Authorization: Bearer {api_key}'
 ```
 
-CopyCopied!
-
 ### Response Example
 
 ### Response
 
-```
 ```
 {
 "limit": 20,
@@ -851,15 +715,11 @@ CopyCopied!
   ]
 }
 ```
-```
-
-CopyCopied!
 
 ### Response Example(智能助手)
 
 ### Response
 
-```
 ```
 {
 "limit": 20,
@@ -886,18 +746,15 @@ CopyCopied!
     ]
 }
 ```
-```
-
-CopyCopied!
 
 ---
 
 
 
-GET/conversations
+## 获取会话列表 (GET /conversations)
 
-[获取会话列表](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#conversations)
-------------------------------------------------------------------------------------------------------
+参考：[获取会话列表](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#conversations)
+------
 
 获取当前用户的会话列表，默认返回最近的 20 条。
 
@@ -954,20 +811,15 @@ GET/conversations
 
 ### Request
 
-GET
-
-/conversations
+**GET** `/conversations`
 
 ```
 curl -X GET 'http://dify.seec.seecoder.cn/v1/conversations?user=abc-123&last_id=&limit=20'\
 --header 'Authorization: Bearer {api_key}'
 ```
 
-CopyCopied!
-
 ### Response
 
-```
 ```
 {
   "limit": 20,
@@ -991,18 +843,15 @@ CopyCopied!
   ]
 }
 ```
-```
-
-CopyCopied!
 
 ---
 
 
 
-DELETE/conversations/:conversation\_id
+## 删除会话 (DELETE /conversations/:conversation_id)
 
-[删除会话](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#delete)
----------------------------------------------------------------------------------------------
+参考：[删除会话](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#delete)
+-----
 
 删除会话。
 
@@ -1027,9 +876,7 @@ DELETE/conversations/:conversation\_id
 
 ### Request
 
-DELETE
-
-/conversations/:conversation\_id
+**DELETE** `/conversations/:conversation_id`
 
 ```
 curl -X DELETE 'http://dify.seec.seecoder.cn/v1/conversations/:conversation_id' \
@@ -1040,26 +887,20 @@ curl -X DELETE 'http://dify.seec.seecoder.cn/v1/conversations/:conversation_id' 
 }'
 ```
 
-CopyCopied!
-
 ### Response
 
 ```
-```
 204 No Content
 ```
-```
-
-CopyCopied!
 
 ---
 
 
 
-POST/conversations/:conversation\_id/name
+## 会话重命名 (POST /conversations/:conversation_id/name)
 
-[会话重命名](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#rename)
-----------------------------------------------------------------------------------------------
+参考：[会话重命名](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#rename)
+------
 
 对会话进行重命名，会话名称用于显示在支持多会话的客户端上。
 
@@ -1106,9 +947,7 @@ POST/conversations/:conversation\_id/name
 
 ### Request
 
-POST
-
-/conversations/:conversation\_id/name
+**POST** `/conversations/:conversation_id/name`
 
 ```
 curl -X POST 'http://dify.seec.seecoder.cn/v1/conversations/:conversation_id/name' \
@@ -1121,11 +960,8 @@ curl -X POST 'http://dify.seec.seecoder.cn/v1/conversations/:conversation_id/nam
 }'
 ```
 
-CopyCopied!
-
 ### Response
 
-```
 ```
 {
   "id": "34d511d5-56de-4f16-a997-57b379508443",
@@ -1137,18 +973,15 @@ CopyCopied!
   "updated_at": 1732734510
 }
 ```
-```
-
-CopyCopied!
 
 ---
 
 
 
-GET/conversations/:conversation\_id/variables
+## 获取对话变量 (GET /conversations/:conversation_id/variables)
 
-[获取对话变量](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#conversation-variables)
----------------------------------------------------------------------------------------------------------------
+参考：[获取对话变量](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#conversation-variables)
+---------------
 
 从特定对话中检索变量。此端点对于提取对话过程中捕获的结构化数据非常有用。
 
@@ -1209,31 +1042,22 @@ GET/conversations/:conversation\_id/variables
 
 ### Request
 
-GET
-
-/conversations/:conversation\_id/variables
+**GET** `/conversations/:conversation_id/variables`
 
 ```
 curl -X GET 'http://dify.seec.seecoder.cn/v1/conversations/{conversation_id}/variables?user=abc-123' \
 --header 'Authorization: Bearer {api_key}'
 ```
 
-CopyCopied!
-
 ### Request with variable name filter
 
-```
 ```
 curl -X GET '${props.appDetail.api_base_url}/conversations/{conversation_id}/variables?user=abc-123&variable_name=customer_name' \
 --header 'Authorization: Bearer {api_key}'
 ```
-```
-
-CopyCopied!
 
 ### Response
 
-```
 ```
 {
   "limit": 100,
@@ -1260,18 +1084,15 @@ CopyCopied!
   ]
 }
 ```
-```
-
-CopyCopied!
 
 ---
 
 
 
-POST/audio-to-text
+## 语音转文字 (POST /audio-to-text)
 
-[语音转文字](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#audio)
----------------------------------------------------------------------------------------------
+参考：[语音转文字](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#audio)
+-----
 
 ### Request Body
 
@@ -1302,9 +1123,7 @@ POST/audio-to-text
 
 ### Request
 
-POST
-
-/audio-to-text
+**POST** `/audio-to-text`
 
 ```
 curl -X POST 'http://dify.seec.seecoder.cn/v1/audio-to-text' \
@@ -1312,28 +1131,22 @@ curl -X POST 'http://dify.seec.seecoder.cn/v1/audio-to-text' \
 --form 'file=@localfile;type=audio/[mp3|mp4|mpeg|mpga|m4a|wav|webm]
 ```
 
-CopyCopied!
-
 ### Response
 
-```
 ```
 {
   "text": "hello"
 }
 ```
-```
-
-CopyCopied!
 
 ---
 
 
 
-POST/text-to-audio
+## 文字转语音 (POST /text-to-audio)
 
-[文字转语音](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#audio)
----------------------------------------------------------------------------------------------
+参考：[文字转语音](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#audio)
+-----
 
 文字转语音。
 
@@ -1366,9 +1179,7 @@ POST/text-to-audio
 
 ### Request
 
-POST
-
-/text-to-audio
+**POST** `/text-to-audio`
 
 ```
 curl -o text-to-audio.mp3 -X POST 'http://dify.seec.seecoder.cn/v1/text-to-audio' \
@@ -1381,28 +1192,22 @@ curl -o text-to-audio.mp3 -X POST 'http://dify.seec.seecoder.cn/v1/text-to-audio
 }'
 ```
 
-CopyCopied!
-
 ### headers
 
-```
 ```
 {
   "Content-Type": "audio/wav"
 }
 ```
-```
-
-CopyCopied!
 
 ---
 
 
 
-GET/info
+## 获取应用基本信息 (GET /info)
 
-[获取应用基本信息](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#info)
------------------------------------------------------------------------------------------------
+参考：[获取应用基本信息](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#info)
+-------
 
 用于获取应用的基本信息
 
@@ -1414,20 +1219,15 @@ GET/info
 
 ### Request
 
-GET
-
-/info
+**GET** `/info`
 
 ```
 curl -X GET 'http://dify.seec.seecoder.cn/v1/info' \
 -H 'Authorization: Bearer {api_key}'
 ```
 
-CopyCopied!
-
 ### Response
 
-```
 ```
 {
   "name": "My App",
@@ -1440,18 +1240,15 @@ CopyCopied!
   "author_name": "Dify"
 }
 ```
-```
-
-CopyCopied!
 
 ---
 
 
 
-GET/parameters
+## 获取应用参数 (GET /parameters)
 
-[获取应用参数](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#parameters)
----------------------------------------------------------------------------------------------------
+参考：[获取应用参数](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#parameters)
+---
 
 用于进入页面一开始，获取功能开关、输入参数名称、类型及默认值等使用。
 
@@ -1505,20 +1302,15 @@ GET/parameters
 
 ### Request
 
-GET
-
-/parameters
+**GET** `/parameters`
 
 ```
  curl -X GET 'http://dify.seec.seecoder.cn/v1/parameters'\
 --header 'Authorization: Bearer {api_key}'
 ```
 
-CopyCopied!
-
 ### Response
 
-```
 ```
 {
   "introduction": "nice to meet you",
@@ -1554,18 +1346,15 @@ CopyCopied!
   }
 }
 ```
-```
-
-CopyCopied!
 
 ---
 
 
 
-GET/meta
+## 获取应用 Meta 信息 (GET /meta)
 
-[获取应用Meta信息](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#meta)
--------------------------------------------------------------------------------------------------
+参考：[获取应用Meta信息](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#meta)
+---------
 
 用于获取工具 icon
 
@@ -1581,20 +1370,15 @@ GET/meta
 
 ### Request
 
-POST
-
-/meta
+**POST** `/meta`
 
 ```
 curl -X GET 'http://dify.seec.seecoder.cn/v1/meta' \
 -H 'Authorization: Bearer {api_key}'
 ```
 
-CopyCopied!
-
 ### Response
 
-```
 ```
 {
   "tool_icons": {
@@ -1606,18 +1390,15 @@ CopyCopied!
   }
 }
 ```
-```
-
-CopyCopied!
 
 ---
 
 
 
-GET/site
+## 获取应用 WebApp 设置 (GET /site)
 
-[获取应用 WebApp 设置](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#site)
------------------------------------------------------------------------------------------------------
+参考：[获取应用 WebApp 设置](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#site)
+-----
 
 用于获取应用的 WebApp 设置
 
@@ -1640,20 +1421,15 @@ GET/site
 
 ### Request
 
-POST
-
-/meta
+**POST** `/meta`
 
 ```
 curl -X GET 'http://dify.seec.seecoder.cn/v1/site' \
 -H 'Authorization: Bearer {api_key}'
 ```
 
-CopyCopied!
-
 ### Response
 
-```
 ```
 {
   "title": "My App",
@@ -1672,18 +1448,15 @@ CopyCopied!
   "use_icon_as_answer_icon": false,
 }
 ```
-```
-
-CopyCopied!
 
 ---
 
 
 
-GET/apps/annotations
+## 获取标注列表 (GET /apps/annotations)
 
-[获取标注列表](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#annotation_list)
---------------------------------------------------------------------------------------------------------
+参考：[获取标注列表](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#annotation_list)
+---
 
 ### Query
 
@@ -1706,20 +1479,15 @@ GET/apps/annotations
 
 ### Request
 
-GET
-
-/apps/annotations
+**GET** `/apps/annotations`
 
 ```
 curl --location --request GET 'http://dify.seec.seecoder.cn/v1/apps/annotations?page=1&limit=20' \
 --header 'Authorization: Bearer {api_key}'
 ```
 
-CopyCopied!
-
 ### Response
 
-```
 ```
 {
   "data": [
@@ -1737,18 +1505,15 @@ CopyCopied!
   "page": 1
 }
 ```
-```
-
-CopyCopied!
 
 ---
 
 
 
-POST/apps/annotations
+## 创建标注 (POST /apps/annotations)
 
-[创建标注](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#create_annotation)
---------------------------------------------------------------------------------------------------------
+参考：[创建标注](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#create_annotation)
+---
 
 ### Query
 
@@ -1771,9 +1536,7 @@ POST/apps/annotations
 
 ### Request
 
-POST
-
-/apps/annotations
+**POST** `/apps/annotations`
 
 ```
 curl --location --request POST 'http://dify.seec.seecoder.cn/v1/apps/annotations' \
@@ -1782,11 +1545,8 @@ curl --location --request POST 'http://dify.seec.seecoder.cn/v1/apps/annotations
 --data-raw '{"question": "What is your name?","answer": "I am Dify."}'
 ```
 
-CopyCopied!
-
 ### Response
 
-```
 ```
 {
   "id": "69d48372-ad81-4c75-9c46-2ce197b4d402",
@@ -1796,18 +1556,15 @@ CopyCopied!
   "created_at": 1735625869
 }
 ```
-```
-
-CopyCopied!
 
 ---
 
 
 
-PUT/apps/annotations/{annotation\_id}
+## 更新标注 (PUT /apps/annotations/{annotation_id})
 
-[更新标注](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#update_annotation)
---------------------------------------------------------------------------------------------------------
+参考：[更新标注](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#update_annotation)
+--------
 
 ### Query
 
@@ -1849,11 +1606,8 @@ curl --location --request PUT 'http://dify.seec.seecoder.cn/v1/apps/annotations/
 --data-raw '{"question": "What is your name?","answer": "I am Dify."}'
 ```
 
-CopyCopied!
-
 ### Response
 
-```
 ```
 {
   "id": "69d48372-ad81-4c75-9c46-2ce197b4d402",
@@ -1863,18 +1617,15 @@ CopyCopied!
   "created_at": 1735625869
 }
 ```
-```
-
-CopyCopied!
 
 ---
 
 
 
-DELETE/apps/annotations/{annotation\_id}
+## 删除标注 (DELETE /apps/annotations/{annotation_id})
 
-[删除标注](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#delete_annotation)
---------------------------------------------------------------------------------------------------------
+参考：[删除标注](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#delete_annotation)
+--------
 
 ### Query
 
@@ -1899,26 +1650,20 @@ curl --location --request DELETE 'http://dify.seec.seecoder.cn/v1/apps/annotatio
 --header 'Content-Type: application/json'
 ```
 
-CopyCopied!
-
 ### Response
 
 ```
-```
 204 No Content
 ```
-```
-
-CopyCopied!
 
 ---
 
 
 
-POST/apps/annotation-reply/{action}
+## 标注回复初始设置 (POST /apps/annotation-reply/{action})
 
-[标注回复初始设置](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#initial_annotation_reply_settings)
-----------------------------------------------------------------------------------------------------------------------------
+参考：[标注回复初始设置](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#initial_annotation_reply_settings)
+----------------------------
 
 ### Query
 
@@ -1959,9 +1704,7 @@ POST/apps/annotation-reply/{action}
 
 ### Request
 
-POST
-
-/apps/annotation-reply/{action}
+**POST** `/apps/annotation-reply/{action}`
 
 ```
 curl --location --request POST 'http://dify.seec.seecoder.cn/v1/apps/annotation-reply/{action}' \
@@ -1970,20 +1713,14 @@ curl --location --request POST 'http://dify.seec.seecoder.cn/v1/apps/annotation-
 --data-raw '{"score_threshold": 0.9, "embedding_provider_name": "zhipu", "embedding_model_name": "embedding_3"}'
 ```
 
-CopyCopied!
-
 ### Response
 
-```
 ```
 {
   "job_id": "b15c8f68-1cf4-4877-bf21-ed7cf2011802",
   "job_status": "waiting"
 }
 ```
-```
-
-CopyCopied!
 
 该接口是异步执行，所以会返回一个job\_id，通过查询job状态接口可以获取到最终的执行结果。
 
@@ -1991,10 +1728,10 @@ CopyCopied!
 
 
 
-GET/apps/annotation-reply/{action}/status/{job\_id}
+## 查询标注回复初始设置任务状态 (GET /apps/annotation-reply/{action}/status/{job_id})
 
-[查询标注回复初始设置任务状态](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#initial_annotation_reply_settings_task_status)
-----------------------------------------------------------------------------------------------------------------------------------------------
+参考：[查询标注回复初始设置任务状态](https://dify.seec.seecoder.cn/app/bd412c21-6516-4bed-8f15-4606a8285761/develop#initial_annotation_reply_settings_task_status)
+---
 
 ### Query
 
@@ -2017,20 +1754,15 @@ GET/apps/annotation-reply/{action}/status/{job\_id}
 
 ### Request
 
-GET
-
-/apps/annotations
+**GET** `/apps/annotation-reply/{action}/status/{job_id}`
 
 ```
 curl --location --request GET 'http://dify.seec.seecoder.cn/v1/apps/annotation-reply/{action}/status/{job_id}' \
 --header 'Authorization: Bearer {api_key}'
 ```
 
-CopyCopied!
-
 ### Response
 
-```
 ```
 {
   "job_id": "b15c8f68-1cf4-4877-bf21-ed7cf2011802",
@@ -2038,6 +1770,3 @@ CopyCopied!
   "error_msg": ""
 }
 ```
-```
-
-CopyCopied!

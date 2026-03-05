@@ -180,6 +180,13 @@ export function sendAIMessage(
 }
 
 /**
+ * 主动终止指定会话的流式生成
+ */
+export async function stopAIMessage(conversationId: string): Promise<void> {
+  await post(`/ai/conversations/${conversationId}/abort`, {});
+}
+
+/**
  * 获取历史会话列表
  */
 export async function getConversations(): Promise<Conversation[]> {

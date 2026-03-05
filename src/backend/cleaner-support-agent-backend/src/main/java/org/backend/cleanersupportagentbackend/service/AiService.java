@@ -111,18 +111,25 @@ public class AiService {
         final AtomicReference<String> difyMessageIdRef = new AtomicReference<>();
         final Conversation finalConversation = conversation;
 
+        // 使用本地 conversationId 作为任务ID，用于取消 Dify 流
+        final String taskId = conversation.getConversationId();
+
         // 设置SSE超时和错误处理
         emitter.onTimeout(() -> {
-            logger.warn("SSE connection timed out for conversation: {}", finalConversation.getConversationId());
+            logger.warn("SSE connection timed out for conversation: {}", taskId);
+            difyClient.cancelStream(taskId);
             emitter.complete();
         });
 
         emitter.onError(e -> {
-            logger.error("SSE error for conversation: {}", finalConversation.getConversationId(), e);
+            // 客户端断连或其他错误时，取消 Dify 流（避免继续消耗配额并防止保存截断消息）
+            logger.warn("SSE error for conversation: {}, cancelling Dify stream", taskId);
+            difyClient.cancelStream(taskId);
         });
 
         // 调用Dify API
         difyClient.streamChat(
+                taskId,
                 userId,
                 request.getQuery(),
                 conversation.getDifyConversationId(),
@@ -500,6 +507,15 @@ public class AiService {
         return "[图片描述]\n" + imageDescription + "\n\n" +
                "[用户问题]\n" + userQuery + "\n\n" +
                "请基于以上图片描述和用户问题，提供专业的故障诊断和解决方案。";
+    }
+
+    /**
+     * 主动停止指定会话的 Dify 流式请求。
+     * 中断后 message_end 不会被触发，saveAiResponse() 不会被调用，截断内容不入库。
+     */
+    public void stopChat(String conversationId) {
+        logger.info("User requested stop for conversation: {}", conversationId);
+        difyClient.cancelStream(conversationId);
     }
 
     /**

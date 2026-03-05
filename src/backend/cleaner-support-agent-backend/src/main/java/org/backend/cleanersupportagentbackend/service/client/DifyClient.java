@@ -15,6 +15,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -31,6 +32,8 @@ public class DifyClient {
     private final DifyConfig difyConfig;
     private final ObjectMapper objectMapper;
     private final ExecutorService executorService;
+    // taskId -> 正在进行的 HttpURLConnection，用于主动中断流
+    private final ConcurrentHashMap<String, HttpURLConnection> activeConnections = new ConcurrentHashMap<>();
 
     public DifyClient(DifyConfig difyConfig, ObjectMapper objectMapper) {
         this.difyConfig = difyConfig;
@@ -39,8 +42,22 @@ public class DifyClient {
     }
 
     /**
+     * 取消指定任务的 Dify 流式请求。
+     * 调用 HttpURLConnection.disconnect() 关闭底层 Socket，
+     * 使读取线程中的 readLine() 抛出 IOException 从而退出循环。
+     */
+    public void cancelStream(String taskId) {
+        HttpURLConnection conn = activeConnections.remove(taskId);
+        if (conn != null) {
+            logger.info("Cancelling Dify stream for task: {}", taskId);
+            conn.disconnect();
+        }
+    }
+
+    /**
      * 发送聊天消息并以流式方式接收响应
      *
+     * @param taskId              任务ID（通常为本地 conversationId），用于取消流
      * @param userId              系统用户ID
      * @param query               用户查询内容
      * @param difyConversationId  Dify会话ID（新会话时为null）
@@ -48,7 +65,7 @@ public class DifyClient {
      * @param onError             错误回调
      * @param onComplete          完成回调
      */
-    public void streamChat(String userId, String query, String difyConversationId,
+    public void streamChat(String taskId, String userId, String query, String difyConversationId,
                            Consumer<DifyEvent> onEvent,
                            Consumer<Exception> onError,
                            Runnable onComplete) {
@@ -73,6 +90,9 @@ public class DifyClient {
                 connection.setConnectTimeout((int) difyConfig.getTimeout());
                 connection.setReadTimeout((int) difyConfig.getTimeout());
                 connection.setDoOutput(true);
+
+                // 注册连接，以便外部可通过 cancelStream() 中断
+                activeConnections.put(taskId, connection);
 
                 // 构建请求体
                 Map<String, Object> requestBody = new HashMap<>();
@@ -150,6 +170,7 @@ public class DifyClient {
                 logger.error("Dify API error", e);
                 onError.accept(new RuntimeException("AI服务暂时不可用：" + e.getMessage()));
             } finally {
+                activeConnections.remove(taskId);
                 if (connection != null) {
                     connection.disconnect();
                 }
