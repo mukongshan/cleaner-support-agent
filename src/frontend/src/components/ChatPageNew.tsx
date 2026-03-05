@@ -296,6 +296,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
   const [inputText, setInputText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [aiThinking, setAiThinking] = useState(false);
+  const [thinkingPaused, setThinkingPaused] = useState(false);
   const [thinkingStep, setThinkingStep] = useState(0);
   const [showNewChatDialog, setShowNewChatDialog] = useState(false);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
@@ -349,6 +350,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
   // 停止生成相关：保存取消函数和当前活跃的 conversationId
   const cancelChatRef = useRef<(() => void) | null>(null);
   const activeConvIdRef = useRef<string | null>(null);
+  const stepIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const thinkingSteps = [
     t('ai_thinking'),
@@ -1085,12 +1087,14 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
         query: hasText ? text : undefined
       });
       setAiThinking(true);
+      setThinkingPaused(false);
       setThinkingStep(0);
 
-      const stepInterval = setInterval(() => {
+      stepIntervalRef.current = setInterval(() => {
         setThinkingStep(prev => {
           if (prev >= thinkingSteps.length - 1) {
-            clearInterval(stepInterval);
+            clearInterval(stepIntervalRef.current!);
+            stepIntervalRef.current = null;
             return prev;
           }
           return prev + 1;
@@ -1108,7 +1112,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
         conversationId: currentSessionId || undefined
       });
 
-      const cancelFunction = sendAIMessageWithImage(
+      cancelChatRef.current = sendAIMessageWithImage(
         {
           recognitionId,
           query: hasText ? text : undefined,
@@ -1152,7 +1156,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
               conversationId: event.conversation_id,
               metadata: event.metadata
             });
-            clearInterval(stepInterval);
+            if (stepIntervalRef.current) { clearInterval(stepIntervalRef.current); stepIntervalRef.current = null; }
             setAiThinking(false);
             setThinkingStep(0);
 
@@ -1192,6 +1196,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
                 conversationId: event.conversation_id,
                 previousSessionId: currentSessionId
               });
+              activeConvIdRef.current = event.conversation_id; // 供停止按钮使用
               setCurrentSessionId(event.conversation_id);
               conversationIdSaved = true;
             }
@@ -1219,8 +1224,10 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
               stack: error.stack?.substring(0, 500)
             }
           });
-          clearInterval(stepInterval);
+          if (stepIntervalRef.current) { clearInterval(stepIntervalRef.current); stepIntervalRef.current = null; }
           setAiThinking(false);
+          cancelChatRef.current = null;
+          activeConvIdRef.current = null;
           setMessages(prev =>
             prev.map(msg =>
               msg.id === aiMessageId
@@ -1231,7 +1238,9 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
         },
         () => {
           console.log('[ChatPage] [发送消息] 图片对话完成', { aiMessageId });
-          clearInterval(stepInterval);
+          if (stepIntervalRef.current) { clearInterval(stepIntervalRef.current); stepIntervalRef.current = null; }
+          cancelChatRef.current = null;
+          activeConvIdRef.current = null;
         }
       );
 
@@ -1264,13 +1273,15 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
     }
 
     setAiThinking(true);
+    setThinkingPaused(false);
     setThinkingStep(0);
 
     // 思考步骤动画
-    const stepInterval = setInterval(() => {
+    stepIntervalRef.current = setInterval(() => {
       setThinkingStep(prev => {
         if (prev >= thinkingSteps.length - 1) {
-          clearInterval(stepInterval);
+          clearInterval(stepIntervalRef.current!);
+          stepIntervalRef.current = null;
           return prev;
         }
         return prev + 1;
@@ -1368,7 +1379,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
 
         if (event.event === 'message_end') {
           console.log('消息结束');
-          clearInterval(stepInterval);
+          if (stepIntervalRef.current) { clearInterval(stepIntervalRef.current); stepIntervalRef.current = null; }
           setAiThinking(false);
 
           // 确保会话 ID 已保存（如果 message 事件中没有保存，在这里保存）
@@ -1426,7 +1437,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
       // onError: 错误处理（AbortError 由 handleStopGeneration 处理，不在此显示错误气泡）
       (error) => {
         console.error('AI 对话错误:', error);
-        clearInterval(stepInterval);
+        if (stepIntervalRef.current) { clearInterval(stepIntervalRef.current); stepIntervalRef.current = null; }
         setAiThinking(false);
         cancelChatRef.current = null;
         activeConvIdRef.current = null;
@@ -1445,7 +1456,7 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
       },
       // onComplete: 完成
       () => {
-        clearInterval(stepInterval);
+        if (stepIntervalRef.current) { clearInterval(stepIntervalRef.current); stepIntervalRef.current = null; }
         setAiThinking(false);
         cancelChatRef.current = null;
         activeConvIdRef.current = null;
@@ -1455,6 +1466,9 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
 
   // 停止正在生成的 AI 回复
   const handleStopGeneration = async () => {
+    // 立即更新显示状态
+    setThinkingPaused(true);
+
     // 1. 中断前端 SSE 连接
     if (cancelChatRef.current) {
       cancelChatRef.current();
@@ -1482,6 +1496,10 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
     });
 
     // 4. 恢复 UI 状态
+    if (stepIntervalRef.current) {
+      clearInterval(stepIntervalRef.current);
+      stepIntervalRef.current = null;
+    }
     setAiThinking(false);
   };
 
@@ -1997,10 +2015,14 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
                       )
                     )}
 
-                    {/* 流式输出时显示加载动画（在气泡内部） */}
-                    {isStreamingMessage && (
+                    {/* 流式输出时显示加载动画；停止后显示"思考已暂停" */}
+                    {(isStreamingMessage || (thinkingPaused && message.type === 'ai' && index === lastAIMessageIndex)) && (
                       <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400">
-                        <Loader2 className="w-3 h-3 animate-spin text-blue-400" />
+                        {thinkingPaused ? (
+                          <span>思考已暂停</span>
+                        ) : (
+                          <Loader2 className="w-3 h-3 animate-spin text-blue-400" />
+                        )}
                       </div>
                     )}
 
@@ -2127,8 +2149,8 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
           })
         )}
 
-        {/* 独立思考气泡：仅在 AI 还未开始输出任何内容时显示 */}
-        {aiThinking && messages[messages.length - 1]?.type !== 'ai' && (
+        {/* 独立思考气泡：仅在 AI 还未开始输出任何内容时显示；停止后改为"思考已暂停" */}
+        {(aiThinking || thinkingPaused) && messages[messages.length - 1]?.type !== 'ai' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -2152,8 +2174,14 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
                 className="bg-white rounded-2xl rounded-tl-sm shadow-sm px-4 py-3"
               >
                 <div className="flex items-center gap-2 text-sm text-gray-400">
-                  <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
-                  <span>正在思考…</span>
+                  {thinkingPaused ? (
+                    <span>思考已暂停</span>
+                  ) : (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+                      <span>正在思考…</span>
+                    </>
+                  )}
                 </div>
               </motion.div>
             </div>

@@ -415,37 +415,54 @@ public class AiService {
         messageRepository.save(userMessage);
         
         // 创建SSE发射器
-        SseEmitter emitter = new SseEmitter(60000L); // 60秒超时
-        
-        // TODO: 这里应该调用Dify API并转发SSE流
-        // 目前先返回模拟响应
-        try {
-            String mockResponse = "根据图片描述：" + imageDescription.substring(0, Math.min(50, imageDescription.length())) + "...\n\n" +
-                    "这是一个基于图片识别的模拟AI回复。请配置Dify API以获取真实回复。";
-            
-            // 保存AI回复
-            Message aiMessage = Message.builder()
-                    .conversation(conversation)
-                    .role(Message.MessageRole.assistant)
-                    .content(mockResponse)
-                    .timestamp(LocalDateTime.now())
-                    .build();
-            messageRepository.save(aiMessage);
-            
-            // 发送SSE事件
-            emitter.send(SseEmitter.event()
-                    .name("message")
-                    .data("{\"event\":\"message\",\"answer\":\"" + mockResponse.replace("\"", "\\\"") + "\",\"conversation_id\":\"" + conversation.getConversationId() + "\"}"));
-            
-            emitter.send(SseEmitter.event()
-                    .name("message_end")
-                    .data("{\"event\":\"message_end\",\"metadata\":{}}"));
-            
+        SseEmitter emitter = new SseEmitter(difyConfig.getTimeout());
+
+        final AtomicReference<StringBuilder> fullAnswerRef = new AtomicReference<>(new StringBuilder());
+        final AtomicReference<String> difyConversationIdRef = new AtomicReference<>(conversation.getDifyConversationId());
+        final AtomicReference<String> difyMessageIdRef = new AtomicReference<>();
+        final Conversation finalConversation = conversation;
+        final String taskId = conversation.getConversationId();
+
+        emitter.onTimeout(() -> {
+            logger.warn("SSE connection timed out for conversation: {}", taskId);
+            difyClient.cancelStream(taskId);
             emitter.complete();
-        } catch (IOException e) {
-            emitter.completeWithError(e);
-        }
-        
+        });
+        emitter.onError(e -> {
+            logger.warn("SSE error for conversation: {}, cancelling Dify stream", taskId);
+            difyClient.cancelStream(taskId);
+        });
+
+        difyClient.streamChat(
+            taskId, userId, fullQuery, conversation.getDifyConversationId(),
+            (DifyEvent event) -> {
+                try {
+                    if ("message".equals(event.getEvent())) {
+                        if (event.getAnswer() != null) fullAnswerRef.get().append(event.getAnswer());
+                        if (event.getConversationId() != null && difyConversationIdRef.get() == null)
+                            difyConversationIdRef.set(event.getConversationId());
+                        if (event.getMessageId() != null) difyMessageIdRef.set(event.getMessageId());
+                        sendSseEvent(emitter, event, finalConversation.getConversationId());
+                    } else if ("message_end".equals(event.getEvent())) {
+                        if (event.getConversationId() != null) difyConversationIdRef.set(event.getConversationId());
+                        saveAiResponse(finalConversation, fullAnswerRef.get().toString(),
+                            difyConversationIdRef.get(), difyMessageIdRef.get());
+                        sendSseEvent(emitter, event, finalConversation.getConversationId());
+                    }
+                } catch (Exception e) { logger.error("Error processing Dify event", e); }
+            },
+            (Exception error) -> {
+                logger.error("Dify API error in chatWithImage", error);
+                try { sendErrorEvent(emitter, error.getMessage(), finalConversation.getConversationId()); }
+                catch (Exception e) { logger.error("Error sending error event", e); }
+                emitter.complete();
+            },
+            () -> {
+                try { emitter.complete(); }
+                catch (Exception e) { logger.error("Error completing SSE emitter", e); }
+            }
+        );
+
         return emitter;
     }
     
