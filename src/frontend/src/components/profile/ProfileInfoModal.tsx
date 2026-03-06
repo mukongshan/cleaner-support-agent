@@ -6,6 +6,7 @@ import {
   X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { UserProfile, updateUserProfile, uploadMedia, API_BASE_URL } from '../../services/api';
 
@@ -42,7 +43,6 @@ export function ProfileInfoModal({
   const [editError, setEditError] = useState('');
   const [editLoading, setEditLoading] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [showPhoneToast, setShowPhoneToast] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 注意：不在这里返回 null，让父组件的 AnimatePresence 处理显示/隐藏
@@ -305,10 +305,7 @@ export function ProfileInfoModal({
 
               {/* 手机号（不可修改） */}
               <button
-                onClick={() => {
-                  setShowPhoneToast(true);
-                  setTimeout(() => setShowPhoneToast(false), 2000);
-                }}
+                onClick={() => toast.warning(t('phone_number_cannot_change'), { duration: 2000 })}
                 style={{
                   width: '100%',
                   display: 'flex',
@@ -418,28 +415,6 @@ export function ProfileInfoModal({
                 </button>
               </div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* 手机号提示 Toast */}
-      <AnimatePresence>
-        {showPhoneToast && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            style={{
-              position: 'fixed',
-              bottom: '5rem',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 80
-            }}
-          >
-            <div className="bg-gray-900 text-white px-4 py-3 rounded-lg shadow-lg text-sm">
-              {t('phone_number_cannot_change')}
-            </div>
           </motion.div>
         )}
       </AnimatePresence>

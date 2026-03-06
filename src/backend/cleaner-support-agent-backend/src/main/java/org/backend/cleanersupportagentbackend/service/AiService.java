@@ -236,7 +236,7 @@ public class AiService {
             Map<String, Object> eventData = new HashMap<>();
             eventData.put("event", "message");
             eventData.put("conversation_id", localConversationId);
-            eventData.put("answer", "抱歉，" + errorMessage);
+            eventData.put("answer", "抱歉，出现了一些错误，请联系管理员：" + errorMessage);
 
             String jsonData = objectMapper.writeValueAsString(eventData);
             emitter.send(SseEmitter.event()
