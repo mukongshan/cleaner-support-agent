@@ -133,24 +133,17 @@ export function SettingsModal({
                 </div>
               </div>
               
-              {/* 开关操作区 */}
-              <div 
-                className="flex items-center gap-3 shrink-0 ml-3"
-                onClick={(e) => e.stopPropagation()} // 重要：拦截点击事件，防止穿透到外层 div 引起双重切换（即点完没反应的根本原因）
+              {/* Radix UI Switch：左灰关 / 右蓝开，样式由组件内部 data-state 驱动 */}
+              <div
+                className="shrink-0 ml-3"
+                onClick={(e) => e.stopPropagation()}
               >
-                <span className={`text-sm font-medium transition-colors ${confirmBeforeDeleteHistory ? 'text-blue-600' : 'text-gray-400'}`}>
-                  {confirmBeforeDeleteHistory ? (language === 'en' ? 'On' : '已开启') : (language === 'en' ? 'Off' : '已关闭')}
-                </span>
-                
-                {/* 恢复并美化了第三方组件 */}
                 <Switch
                   checked={confirmBeforeDeleteHistory}
                   onCheckedChange={(checked) => {
                     setConfirmBeforeDeleteHistoryState(checked);
                     setConfirmBeforeDeleteHistory(checked);
                   }}
-                  /* 强制指定开启为蓝，关闭为明显的深灰色(gray-300)，确保不会在白底上消失 */
-                  className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-gray-300 shadow-sm transition-colors"
                 />
               </div>
             </div>

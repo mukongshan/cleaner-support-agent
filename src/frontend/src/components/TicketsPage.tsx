@@ -21,7 +21,7 @@ import {
   Sparkles,
   Check,
   Bot,
-  Loader,
+  Loader2,
   ClipboardList
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -458,9 +458,9 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat, isLogge
           {/* 工单列表 */}
           <div className="flex-1 overflow-y-auto px-4 py-4 relative z-0">
             {loading ? (
-          <div className="flex flex-col items-center justify-center h-full">
-            <Loader className="w-12 h-12 text-blue-600 animate-spin mb-4" />
-            <p className="text-sm text-gray-500">加载工单中...</p>
+          <div className="flex flex-col items-center justify-center h-full text-center px-8">
+            <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
+            <p className="text-sm text-gray-500">加载中...</p>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-8">

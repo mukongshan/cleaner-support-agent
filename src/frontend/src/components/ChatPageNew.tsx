@@ -6,7 +6,6 @@ import {
   History,
   FileText,
   AlertCircle,
-  Loader,
   X,
   ClipboardList,
   Sparkles,
@@ -26,6 +25,7 @@ import {
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserRole } from '../App';
 import {
@@ -65,6 +65,20 @@ interface ChatSession {
   messages: Message[];
   createdAt: Date;
   updatedAt: Date;
+}
+
+/** 后台对话槽位：存储在 ref 中，不触发 React 渲染 */
+interface BackgroundSlot {
+  messages: Message[];
+  sessionId: string | null;
+  isStreaming: boolean;
+  isPaused: boolean;
+  cancelFn: (() => void) | null;
+  activeConvId: string | null;
+  stepInterval: ReturnType<typeof setInterval> | null;
+  isHistoryConversation: boolean;
+  followUpQuestions: string[];
+  currentMessageId: string | null;
 }
 
 interface ChatPageProps {
@@ -160,14 +174,29 @@ function parseMessageContent(content: string): {
 // ──────────────────────────────────────────────────────────
 // 可折叠的「思考过程」块
 // ──────────────────────────────────────────────────────────
-function ThinkingBlock({ content, isComplete }: { content: string; isComplete: boolean }) {
-  const [isExpanded, setIsExpanded] = useState(!isComplete);
+function ThinkingBlock({
+  content,
+  isComplete,
+  isStreaming = false,
+}: {
+  content: string;
+  isComplete: boolean;
+  /** 是否是当前正在流式输出的消息 — 只有当 isStreaming=true 时才显示"思考中"动画 */
+  isStreaming?: boolean;
+}) {
+  // 真正"思考中"：内容未完成 且 该消息是当前流
+  const isActivelyThinking = !isComplete && isStreaming;
+
+  const [isExpanded, setIsExpanded] = useState(isActivelyThinking);
 
   useEffect(() => {
-    if (isComplete) {
+    if (isComplete || !isStreaming) {
+      // 流结束（正常完成或被停止）→ 自动折叠
       setIsExpanded(false);
+    } else if (isActivelyThinking) {
+      setIsExpanded(true);
     }
-  }, [isComplete]);
+  }, [isComplete, isStreaming, isActivelyThinking]);
 
   return (
     <div className="mb-3">
@@ -176,15 +205,66 @@ function ThinkingBlock({ content, isComplete }: { content: string; isComplete: b
         className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-500 transition-colors select-none"
       >
         <Brain className="w-3 h-3" />
-        <span>{isComplete ? '查看思考过程' : '思考中…'}</span>
-        {!isComplete && <Loader2 className="w-3 h-3 animate-spin" />}
+        <span>{isActivelyThinking ? '思考中…' : '查看思考过程'}</span>
+        {isActivelyThinking && <Loader2 className="w-3 h-3 animate-spin" />}
         <ChevronDown
           className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? '' : '-rotate-90'}`}
         />
       </button>
       {isExpanded && (
-        <div className="mt-2 pl-3 border-l-2 border-gray-100 rounded">
-          <p className="text-xs text-gray-400 whitespace-pre-wrap leading-relaxed">{content}</p>
+        <div className="mt-2 pl-3 border-l-2 border-gray-100 rounded thinking-md">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              p: ({ children }) => (
+                <p className="text-xs text-gray-400 mb-1.5 last:mb-0 leading-relaxed">{children}</p>
+              ),
+              strong: ({ children }) => (
+                <strong className="font-semibold text-gray-400">{children}</strong>
+              ),
+              em: ({ children }) => (
+                <em className="italic text-gray-400">{children}</em>
+              ),
+              ul: ({ children }) => (
+                <ul className="text-xs text-gray-400 list-disc pl-4 mb-1.5 space-y-0.5">{children}</ul>
+              ),
+              ol: ({ children }) => (
+                <ol className="text-xs text-gray-400 list-decimal pl-4 mb-1.5 space-y-0.5">{children}</ol>
+              ),
+              li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+              h1: ({ children }) => (
+                <h1 className="text-xs font-bold text-gray-400 mb-1 mt-1">{children}</h1>
+              ),
+              h2: ({ children }) => (
+                <h2 className="text-xs font-bold text-gray-400 mb-1 mt-1">{children}</h2>
+              ),
+              h3: ({ children }) => (
+                <h3 className="text-xs font-semibold text-gray-400 mb-0.5 mt-1">{children}</h3>
+              ),
+              pre: ({ children }) => (
+                <pre className="bg-gray-50 p-2 rounded text-xs font-mono overflow-x-auto mb-1.5 text-gray-400">
+                  {children}
+                </pre>
+              ),
+              code: ({ className, children }) => {
+                const isBlock = !!className;
+                if (isBlock) return <code className={className}>{children}</code>;
+                return (
+                  <code className="bg-gray-50 px-1 py-0.5 rounded text-xs font-mono text-gray-400">
+                    {children}
+                  </code>
+                );
+              },
+              blockquote: ({ children }) => (
+                <blockquote className="border-l-2 border-gray-200 pl-2 italic text-gray-400 mb-1.5">
+                  {children}
+                </blockquote>
+              ),
+              hr: () => <hr className="my-1.5 border-gray-200" />,
+            }}
+          >
+            {content}
+          </ReactMarkdown>
         </div>
       )}
     </div>
@@ -284,16 +364,13 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  // 标记历史记录是否已在本次 session 中加载过，避免重复拉取
+  const historyLoadedRef = useRef(false);
+  // 记录上一条删除 toast 的 id，用于连续删除时替换旧提示
+  const deleteToastIdRef = useRef<string | number | null>(null);
   const [hasCreatedNewChat, setHasCreatedNewChat] = useState(false); // 是否创建过新对话
   const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false); // 是否已完成初始加载
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      type: 'ai',
-      content: language === 'zh' ? '你好！我是您的智能助手。有什么我可以帮助您的吗？' : 'Hello! I am your AI assistant. How can I help you?',
-      timestamp: new Date(Date.now() - 60000)
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
 
   // UI状态
   const [inputText, setInputText] = useState('');
@@ -329,7 +406,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
   const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
   const [currentMessageId, setCurrentMessageId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
+
   // 登录提示框状态
   const [showLoginTip, setShowLoginTip] = useState(false);
 
@@ -356,6 +433,12 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
   const cancelChatRef = useRef<(() => void) | null>(null);
   const activeConvIdRef = useRef<string | null>(null);
   const stepIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── 后台槽位（Background Slot）──────────────────────────────
+  // 存储后台继续运行的对话状态，key 为 slotKey（通常等于 sessionId 或 slot-{timestamp}）
+  const backgroundSlotsRef = useRef<Map<string, BackgroundSlot>>(new Map());
+  // 当前视图对应的 slotKey；SSE 回调用它判断路由到视图还是后台
+  const currentSlotKeyRef = useRef<string>(`slot-${Date.now()}`);
 
   const thinkingSteps = [
     t('ai_thinking'),
@@ -444,6 +527,47 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
     prevMessagesLength.current = messages.length;
   }, [messages, aiThinking]);
 
+  /**
+   * 将当前视图状态保存到后台槽位。
+   * @param cancelStream 是否同时取消当前流（切往纯历史对话时需要；新建/切回后台对话时不需要）
+   */
+  const saveCurrentToBackground = (cancelStream = false) => {
+    const slotKey = currentSlotKeyRef.current;
+    if (aiThinking && cancelChatRef.current) {
+      if (cancelStream) {
+        // 取消旧流（切往无后台槽的纯历史对话）
+        cancelChatRef.current();
+        cancelChatRef.current = null;
+        if (stepIntervalRef.current) { clearInterval(stepIntervalRef.current); stepIntervalRef.current = null; }
+        activeConvIdRef.current = null;
+      } else {
+        // 保留流，将引用转移到后台槽位
+        const slot: BackgroundSlot = {
+          messages: [...messages],
+          sessionId: currentSessionId,
+          isStreaming: true,
+          isPaused: false,
+          cancelFn: cancelChatRef.current,
+          activeConvId: activeConvIdRef.current,
+          stepInterval: stepIntervalRef.current,
+          isHistoryConversation,
+          followUpQuestions: [...followUpQuestions],
+          currentMessageId,
+        };
+        // 以 slotKey 存储（流式回调用此 key 路由更新）
+        backgroundSlotsRef.current.set(slotKey, slot);
+        // 若 sessionId 已知，也以 conversationId 为 key 建立别名（loadConversationDetail 查找用）
+        if (currentSessionId && currentSessionId !== slotKey) {
+          backgroundSlotsRef.current.set(currentSessionId, slot);
+        }
+        // 清空当前引用（不取消流，流继续在后台运行）
+        cancelChatRef.current = null;
+        activeConvIdRef.current = null;
+        stepIntervalRef.current = null;
+      }
+    }
+  };
+
   // 加载历史会话列表（调用真实API）
   const loadHistoryConversations = async () => {
     try {
@@ -462,6 +586,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
       }));
 
       setChatSessions(sessions);
+      historyLoadedRef.current = true;
     } catch (error) {
       console.error('加载历史会话失败:', error);
       // 出错时设置为空数组，避免显示假数据
@@ -473,6 +598,42 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
 
   // 加载特定会话的详情（调用真实API）
   const loadConversationDetail = async (conversationId: string) => {
+    // ── 优先检查后台槽位 ──────────────────────────────────────
+    // 若该对话正在后台生成（用户新建了新对话但旧流仍在运行），直接从槽位恢复，无需网络请求
+    const bgSlot = backgroundSlotsRef.current.get(conversationId);
+    if (bgSlot) {
+      // 将当前视图（若也在生成）转移到后台槽
+      saveCurrentToBackground(false);
+
+      // 切换槽位标识，让旧对话的 SSE 回调重新路由到当前视图
+      currentSlotKeyRef.current = conversationId;
+      // 清理所有指向该槽位的 key（可能有 slotKey 和 conversationId 两个 key）
+      backgroundSlotsRef.current.forEach((v, k) => {
+        if (v === bgSlot) backgroundSlotsRef.current.delete(k);
+      });
+
+      // 恢复后台槽位的状态到视图
+      setMessages(bgSlot.messages);
+      setCurrentSessionId(bgSlot.sessionId);
+      setAiThinking(bgSlot.isStreaming);
+      setThinkingPaused(bgSlot.isPaused);
+      setFollowUpQuestions(bgSlot.followUpQuestions);
+      setCurrentMessageId(bgSlot.currentMessageId);
+      setIsHistoryConversation(bgSlot.isHistoryConversation);
+      cancelChatRef.current = bgSlot.cancelFn;
+      activeConvIdRef.current = bgSlot.activeConvId;
+      stepIntervalRef.current = bgSlot.stepInterval;
+      return; // 无需网络请求
+    }
+
+    // ── 无后台槽位：取消当前流，拉取历史数据 ──────────────────
+    // 取消旧流（若有），切往纯历史对话
+    saveCurrentToBackground(true);
+    // 将当前视图切换到新槽位，防止旧流回调（若取消有延迟）污染新视图
+    currentSlotKeyRef.current = conversationId;
+    setAiThinking(false);
+    setThinkingPaused(false);
+
     setLoadingConversation(true);
     try {
       // 调用真实API获取会话详情
@@ -493,7 +654,6 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
       setIsHistoryConversation(true); // 标记为历史对话
     } catch (error) {
       console.error('加载会话详情失败:', error);
-      // 出错时显示错误提示
       setMessages([
         {
           id: 'error',
@@ -508,9 +668,9 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
     }
   };
 
-  // 当打开历史对话时加载列表
+  // 当打开历史对话时加载列表（仅首次，后续由本地状态驱动，不重复拉取）
   useEffect(() => {
-    if (showHistoryDialog) {
+    if (showHistoryDialog && !historyLoadedRef.current) {
       loadHistoryConversations();
     }
   }, [showHistoryDialog]);
@@ -992,6 +1152,53 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
       return;
     }
 
+    // ── 后台槽位路由函数 ─────────────────────────────────────────
+    // 捕获发送时的槽位 key；SSE 回调触发时，通过对比决定路由到当前视图还是后台
+    const slotKey = currentSlotKeyRef.current;
+
+    /** 路由 setMessages：当前视图则触发渲染；后台则静默写 ref */
+    const routeMessages = (updater: (prev: Message[]) => Message[]) => {
+      if (currentSlotKeyRef.current === slotKey) {
+        setMessages(updater);
+      } else {
+        const slot = backgroundSlotsRef.current.get(slotKey);
+        if (slot) slot.messages = updater(slot.messages);
+      }
+    };
+
+    /** 路由 setAiThinking */
+    const routeThinking = (val: boolean) => {
+      if (currentSlotKeyRef.current === slotKey) {
+        setAiThinking(val);
+      } else {
+        const slot = backgroundSlotsRef.current.get(slotKey);
+        if (slot) slot.isStreaming = val;
+      }
+    };
+
+    /** 路由 setCurrentSessionId + activeConvIdRef */
+    const routeSessionId = (id: string) => {
+      if (currentSlotKeyRef.current === slotKey) {
+        setCurrentSessionId(id);
+        activeConvIdRef.current = id;
+      } else {
+        const slot = backgroundSlotsRef.current.get(slotKey);
+        if (slot) { slot.sessionId = id; slot.activeConvId = id; }
+      }
+    };
+
+    /** 路由收尾清理（取消函数置 null） */
+    const routeCleanup = () => {
+      if (currentSlotKeyRef.current === slotKey) {
+        cancelChatRef.current = null;
+        activeConvIdRef.current = null;
+      } else {
+        const slot = backgroundSlotsRef.current.get(slotKey);
+        if (slot) { slot.cancelFn = null; slot.activeConvId = null; slot.isStreaming = false; }
+      }
+    };
+    // ─────────────────────────────────────────────────────────────
+
     // 模式A：图文混发 - 有文本且有已识别的图片
     // 模式B：仅发图片 - 无文本但有已识别的图片
     const hasText = text.trim().length > 0;
@@ -1127,8 +1334,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
           // 收到 conversation_id 时立即保存，供终止按钮调用后端 abort 使用
           if (event.conversation_id && !conversationIdSaved) {
             conversationIdSaved = true;
-            activeConvIdRef.current = event.conversation_id;
-            setCurrentSessionId(event.conversation_id);
+            routeSessionId(event.conversation_id);
             console.log('[ChatPage] [发送消息] 保存会话ID（图片对话）', {
               conversationId: event.conversation_id
             });
@@ -1141,18 +1347,16 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
               answerLength: event.answer.length,
               fullAnswerLength: fullAnswer.length
             });
-            // 更新或添加 AI 消息（确保消息存在）
-            setMessages(prev => {
+            // 更新或添加 AI 消息（通过路由函数：当前视图触发渲染，后台静默写 ref）
+            routeMessages(prev => {
               const lastMsg = prev[prev.length - 1];
               if (lastMsg && lastMsg.id === aiMessageId) {
-                // 更新现有消息
                 return prev.map(msg =>
                   msg.id === aiMessageId
                     ? { ...msg, content: fullAnswer }
                     : msg
                 );
               } else {
-                // 如果消息不存在，添加新消息
                 console.log('[ChatPage] [发送消息] 添加新 AI 消息（图片对话）');
                 return [...prev, {
                   id: aiMessageId,
@@ -1171,14 +1375,13 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
               metadata: event.metadata
             });
             if (stepIntervalRef.current) { clearInterval(stepIntervalRef.current); stepIntervalRef.current = null; }
-            setAiThinking(false);
+            routeThinking(false);
             setThinkingStep(0);
 
             // 确保消息存在且内容正确
-            setMessages(prev => {
+            routeMessages(prev => {
               const existingMsg = prev.find(msg => msg.id === aiMessageId);
               if (!existingMsg) {
-                // 如果消息不存在，创建新消息
                 console.log('[ChatPage] [发送消息] 消息结束时创建新消息（图片对话）');
                 return [...prev, {
                   id: aiMessageId,
@@ -1188,7 +1391,6 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
                   rating: null
                 }];
               } else if (!fullAnswer || fullAnswer.trim() === '') {
-                // 如果没有收到任何回答，更新为错误提示
                 console.warn('[ChatPage] [发送消息] 未收到 AI 回答（图片对话）');
                 return prev.map(msg =>
                   msg.id === aiMessageId
@@ -1196,7 +1398,6 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
                     : msg
                 );
               } else {
-                // 确保最终内容正确
                 return prev.map(msg =>
                   msg.id === aiMessageId
                     ? { ...msg, content: fullAnswer }
@@ -1210,13 +1411,12 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
                 conversationId: event.conversation_id,
                 previousSessionId: currentSessionId
               });
-              activeConvIdRef.current = event.conversation_id; // 供停止按钮使用
-              setCurrentSessionId(event.conversation_id);
+              routeSessionId(event.conversation_id);
               conversationIdSaved = true;
             }
 
-            // 生成相关问题
-            if (fullAnswer && fullAnswer.trim()) {
+            // 生成相关问题（仅当前视图）
+            if (fullAnswer && fullAnswer.trim() && currentSlotKeyRef.current === slotKey) {
               const questions = getFollowUpQuestions(fullAnswer);
               console.log('[ChatPage] [发送消息] 生成相关问题', {
                 aiMessageId,
@@ -1231,9 +1431,8 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
         (error) => {
           if (error.name === 'AbortError') {
             if (stepIntervalRef.current) { clearInterval(stepIntervalRef.current); stepIntervalRef.current = null; }
-            setAiThinking(false);
-            cancelChatRef.current = null;
-            activeConvIdRef.current = null;
+            routeThinking(false);
+            routeCleanup();
             return;
           }
           console.error('[ChatPage] [发送消息] 图片对话失败', {
@@ -1246,10 +1445,9 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
             }
           });
           if (stepIntervalRef.current) { clearInterval(stepIntervalRef.current); stepIntervalRef.current = null; }
-          setAiThinking(false);
-          cancelChatRef.current = null;
-          activeConvIdRef.current = null;
-          setMessages(prev =>
+          routeThinking(false);
+          routeCleanup();
+          routeMessages(prev =>
             prev.map(msg =>
               msg.id === aiMessageId
                 ? { ...msg, content: '抱歉，处理图片时出现了错误。请稍后重试。' }
@@ -1260,8 +1458,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
         () => {
           console.log('[ChatPage] [发送消息] 图片对话完成', { aiMessageId });
           if (stepIntervalRef.current) { clearInterval(stepIntervalRef.current); stepIntervalRef.current = null; }
-          cancelChatRef.current = null;
-          activeConvIdRef.current = null;
+          routeCleanup();
         }
       );
 
@@ -1352,18 +1549,16 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
           fullAnswer += event.answer;
           console.log('累积回答:', fullAnswer.slice(0, 50) + '...');
 
-          // 更新或添加 AI 消息
-          setMessages(prev => {
+          // 更新或添加 AI 消息（路由：当前视图触发渲染，后台静默写 ref）
+          routeMessages(prev => {
             const lastMsg = prev[prev.length - 1];
             if (lastMsg && lastMsg.id === aiMessageId) {
-              // 更新现有消息
               return prev.map(msg =>
                 msg.id === aiMessageId
                   ? { ...msg, content: fullAnswer }
                   : msg
               );
             } else {
-              // 添加新消息
               console.log('添加新 AI 消息');
               return [...prev, {
                 id: aiMessageId,
@@ -1375,17 +1570,13 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
             }
           });
 
-          // 立即保存 conversation_id（如果存在且尚未保存），以便后续消息能继续同一会话
-          // conversation_id 可能在 message 事件中就已经返回，需要立即保存
+          // 立即保存 conversation_id（路由到正确的槽位）
           if (event.conversation_id && !conversationIdSaved) {
             conversationIdSaved = true;
-            activeConvIdRef.current = event.conversation_id; // 供停止按钮使用
             console.log('保存 conversation_id:', event.conversation_id);
+            routeSessionId(event.conversation_id);
 
-            // 立即保存会话ID，确保用户在同一轮对话中发送多条消息时能正确关联
-            setCurrentSessionId(event.conversation_id);
-
-            // 如果是新会话，添加到历史记录列表
+            // 如果是新会话，添加到历史记录列表（无论当前视图还是后台均执行）
             if (isNewConversation) {
               setHasCreatedNewChat(true);
               const newSession: ChatSession = {
@@ -1396,6 +1587,14 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
                 updatedAt: new Date()
               };
               setChatSessions(prev => [newSession, ...prev]);
+              // 同步后台槽位的 slotKey（使 loadConversationDetail 能用 conversationId 找到它）
+              if (currentSlotKeyRef.current !== slotKey) {
+                const slot = backgroundSlotsRef.current.get(slotKey);
+                if (slot) {
+                  backgroundSlotsRef.current.delete(slotKey);
+                  backgroundSlotsRef.current.set(event.conversation_id, slot);
+                }
+              }
             }
           }
         }
@@ -1403,18 +1602,14 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
         if (event.event === 'message_end') {
           console.log('消息结束');
           if (stepIntervalRef.current) { clearInterval(stepIntervalRef.current); stepIntervalRef.current = null; }
-          setAiThinking(false);
+          routeThinking(false);
 
-          // 确保会话 ID 已保存（如果 message 事件中没有保存，在这里保存）
-          // 有些情况下 conversation_id 可能在 message_end 事件中才返回
+          // 确保会话 ID 已保存
           if (event.conversation_id && !conversationIdSaved) {
             conversationIdSaved = true;
             console.log('在 message_end 中保存 conversation_id:', event.conversation_id);
+            routeSessionId(event.conversation_id);
 
-            // 保存会话ID
-            setCurrentSessionId(event.conversation_id);
-
-            // 如果是新会话，添加到历史记录列表
             if (isNewConversation) {
               setHasCreatedNewChat(true);
               const newSession: ChatSession = {
@@ -1425,13 +1620,20 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
                 updatedAt: new Date()
               };
               setChatSessions(prev => [newSession, ...prev]);
+              if (currentSlotKeyRef.current !== slotKey) {
+                const slot = backgroundSlotsRef.current.get(slotKey);
+                if (slot) {
+                  backgroundSlotsRef.current.delete(slotKey);
+                  backgroundSlotsRef.current.set(event.conversation_id, slot);
+                }
+              }
             }
           }
 
           // 如果没有收到任何回答，显示错误提示
           if (!fullAnswer || fullAnswer.trim() === '') {
             console.warn('未收到 AI 回答');
-            setMessages(prev => [...prev, {
+            routeMessages(prev => [...prev, {
               id: aiMessageId,
               type: 'ai' as const,
               content: '抱歉，我没有收到回复。请重试。',
@@ -1443,7 +1645,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
           // 如果有检索资源，可以添加引用
           if (event.metadata?.retriever_resources && event.metadata.retriever_resources.length > 0) {
             const resource = event.metadata.retriever_resources[0];
-            setMessages(prev => prev.map(msg =>
+            routeMessages(prev => prev.map(msg =>
               msg.id === aiMessageId
                 ? {
                   ...msg,
@@ -1455,21 +1657,26 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
                 : msg
             ));
           }
+
+          // 生成相关问题（仅当前视图）
+          if (fullAnswer && fullAnswer.trim() && currentSlotKeyRef.current === slotKey) {
+            const questions = getFollowUpQuestions(fullAnswer);
+            setFollowUpQuestions(questions);
+            setCurrentMessageId(aiMessageId);
+          }
         }
       },
-      // onError: 错误处理（AbortError 由 handleStopGeneration 处理，不在此显示错误气泡）
+      // onError: 错误处理
       (error) => {
         console.error('AI 对话错误:', error);
         if (stepIntervalRef.current) { clearInterval(stepIntervalRef.current); stepIntervalRef.current = null; }
-        setAiThinking(false);
-        cancelChatRef.current = null;
-        activeConvIdRef.current = null;
+        routeThinking(false);
+        routeCleanup();
 
-        // 显示详细的错误消息
         const errorMessage = error.message || '未知错误';
         console.error('错误详情:', errorMessage);
 
-        setMessages(prev => [...prev, {
+        routeMessages(prev => [...prev, {
           id: aiMessageId,
           type: 'ai' as const,
           content: `抱歉，我遇到了问题：${errorMessage}\n\n请检查网络连接或稍后再试。`,
@@ -1480,14 +1687,13 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
       // onComplete: 完成
       () => {
         if (stepIntervalRef.current) { clearInterval(stepIntervalRef.current); stepIntervalRef.current = null; }
-        setAiThinking(false);
-        cancelChatRef.current = null;
-        activeConvIdRef.current = null;
+        routeThinking(false);
+        routeCleanup();
       }
     );
   };
 
-  // 停止正在生成的 AI 回复
+  // 停止正在生成的 AI 回复（仅对当前视图的对话有效）
   const handleStopGeneration = async () => {
     // 立即更新显示状态
     setThinkingPaused(true);
@@ -1524,6 +1730,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
       stepIntervalRef.current = null;
     }
     setAiThinking(false);
+    // 注：isPaused 已通过 setThinkingPaused(true) 更新视图，无需额外操作
   };
 
   // 处理初始消息
@@ -1620,29 +1827,53 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
     setShowNewChatDialog(false);
   };
 
-  /** 重置为“新对话”状态（用于新建对话或删除当前会话后） */
+  /** 重置为"新对话"状态（用于新建对话或删除当前会话后） */
   const resetToNewChat = () => {
-    setMessages([
-      {
-        id: Date.now().toString(),
-        type: 'ai',
-        content: language === 'zh' ? '你好！我是您的智能助手。有什么我可以帮助您的吗？' : 'Hello! I am your AI assistant. How can I help you?',
-        timestamp: new Date()
-      }
-    ]);
+    // 将旧对话保存为后台槽位（若正在生成，则流继续在后台运行，不取消）
+    saveCurrentToBackground(false);
+
+    // 切换到新槽位
+    const newSlotKey = `slot-${Date.now()}`;
+    currentSlotKeyRef.current = newSlotKey;
+
+    // 重置当前视图状态（新建对话）
+    setAiThinking(false);
+    setThinkingPaused(false);
+    setMessages([]);
     setCurrentSessionId(null);
+    setFollowUpQuestions([]);
+    setCurrentMessageId(null);
     setTicketCreated(false);
     setShowTicketPrompt(false);
     setIsHistoryConversation(false);
     setHasCreatedNewChat(true);
   };
+  /** 弹出删除提示：先 dismiss 上一条，立即弹新的，确保每次都有明显的入场动画 */
+  const showDeleteToast = (type: 'success' | 'error') => {
+    if (deleteToastIdRef.current !== null) {
+      toast.dismiss(deleteToastIdRef.current);
+      deleteToastIdRef.current = null;
+    }
+    const id = type === 'success'
+      ? toast.success('对话已删除', { duration: 2000 })
+      : toast.error('删除失败，请重试', { duration: 3000 });
+    deleteToastIdRef.current = id;
+  };
 
-  /** 执行删除会话：调用接口、刷新列表，若删除的是当前会话则重置为新对话 */
+  /** 执行删除会话：乐观更新本地列表，无需重新拉取 */
   const doDeleteConversation = async (sessionId: string) => {
-    await apiDeleteConversation(sessionId);
-    await loadHistoryConversations();
+    const prevSessions = chatSessions;
+    setChatSessions(prev => prev.filter(s => s.id !== sessionId));
     if (currentSessionId === sessionId) {
       resetToNewChat();
+    }
+    try {
+      await apiDeleteConversation(sessionId);
+      showDeleteToast('success');
+    } catch (err) {
+      setChatSessions(prevSessions);
+      showDeleteToast('error');
+      console.error('删除会话失败:', err);
     }
   };
 
@@ -1650,9 +1881,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
   const handleDeleteSession = (e: React.MouseEvent, session: ChatSession) => {
     e.stopPropagation();
     if (!getConfirmBeforeDeleteHistory()) {
-      doDeleteConversation(session.id).catch((err) => {
-        console.error('删除会话失败:', err);
-      });
+      doDeleteConversation(session.id);
       return;
     }
     setDeleteConfirmSession(session);
@@ -1667,9 +1896,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
     }
     const id = deleteConfirmSession.id;
     setDeleteConfirmSession(null);
-    doDeleteConversation(id).catch((err) => {
-      console.error('删除会话失败:', err);
-    });
+    doDeleteConversation(id);
   };
 
   // 智能提取聊天信息
@@ -1895,23 +2122,30 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
       {/* 对话区域 */}
       <div className="flex-1 overflow-y-auto px-4 py-4 pb-2 space-y-4 relative z-0">
         {loadingConversation ? (
-          /* 加载历史对话的加载动画 */
-          <div className="h-full flex flex-col items-center justify-center">
-            <div className="relative">
-              <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-              <Loader className="w-8 h-8 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
-            </div>
-            <p className="mt-4 text-sm text-gray-600">{t('loading_conversation')}</p>
+          <div className="flex flex-col items-center justify-center h-full text-center px-8">
+            <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
+            <p className="text-sm text-gray-500">{t('loading_conversation')}</p>
           </div>
         ) : messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center px-8">
-            <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-              <AlertCircle className="w-12 h-12 text-blue-600" />
+          <div className="h-full flex flex-col items-center justify-center text-center px-6">
+            <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+              <AIAvatar className="w-12 h-12" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('no_conversations')}</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">{t('no_conversations')}</h3>
             <p className="text-sm text-gray-500 mb-6">
               {t('no_conversations_desc')}
             </p>
+            <div className="w-full grid grid-cols-2 gap-2">
+              {suggestedQuestions.map((q) => (
+                <button
+                  key={q}
+                  onClick={() => setInputText(q)}
+                  className="text-left text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl px-3 py-2.5 transition-colors leading-snug"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
           messages.map((message, index) => {
@@ -1982,9 +2216,9 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
                           const path = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
                           return `${serverUrl}${path}`;
                         };
-                        
+
                         const imageUrl = getImageUrl(message.image);
-                        
+
                         return (
                           <div className="flex flex-col">
                             {/* 上半部分：图片缩略图贴着右侧 */}
@@ -2033,9 +2267,9 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
                           const path = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
                           return `${serverUrl}${path}`;
                         };
-                        
+
                         const imageUrl = getImageUrl(message.image);
-                        
+
                         return (
                           <div className="mb-2">
                             <ImageWithAuth
@@ -2061,7 +2295,11 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
                         return (
                           <div>
                             {thinking !== null && (
-                              <ThinkingBlock content={thinking} isComplete={isThinkingComplete} />
+                              <ThinkingBlock
+                                content={thinking}
+                                isComplete={isThinkingComplete}
+                                isStreaming={isStreamingMessage}
+                              />
                             )}
                             {answer && (
                               <AIMarkdownContent content={answer} />
@@ -2321,18 +2559,28 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
             >
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900">{t('history')}</h3>
-                <button
-                  onClick={() => setShowHistoryDialog(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <X className="w-5 h-5 text-gray-500" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => loadHistoryConversations()}
+                    disabled={loadingHistory}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-40"
+                    title="刷新"
+                  >
+                    <RefreshCw className={`w-4 h-4 text-gray-500 ${loadingHistory ? 'animate-spin' : ''}`} />
+                  </button>
+                  <button
+                    onClick={() => setShowHistoryDialog(false)}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5 text-gray-500" />
+                  </button>
+                </div>
               </div>
 
-              <div className="max-h-[60vh] overflow-y-auto px-4 py-4">
+              <div className="max-h-[60vh] overflow-y-auto px-4 py-4" style={{ minHeight: '196px' }}>
                 {loadingHistory ? (
-                  <div className="text-center py-12">
-                    <Loader className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-4" />
+                  <div className="flex flex-col items-center justify-center py-12 text-center px-8">
+                    <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
                     <p className="text-sm text-gray-500">{t('loading_history')}</p>
                   </div>
                 ) : chatSessions.length === 0 ? (

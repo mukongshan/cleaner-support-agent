@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Toaster } from 'sonner';
 import { Home } from './components/Home';
 import { ChatPage } from './components/ChatPageNew';
 import { ProfilePage } from './components/ProfilePageNew';
@@ -16,7 +17,7 @@ export type UserRole = 'dealer' | 'enduser';
 
 function AppContent() {
   const { t } = useLanguage();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!getToken());
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('chat'); // 默认显示问答界面
@@ -25,11 +26,11 @@ function AppContent() {
   const [userRole, setUserRole] = useState<UserRole>('enduser'); // 默认终端用户
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
-  // 检查登录状态
+  // 记录哪些标签已被访问过（懒加载：首次访问才挂载，之后保持挂载不再销毁）
+  const [mountedTabs, setMountedTabs] = useState<Set<TabType>>(new Set(['chat']));
   useEffect(() => {
-    const token = getToken();
-    setIsLoggedIn(!!token);
-  }, []);
+    setMountedTabs(prev => prev.has(activeTab) ? prev : new Set([...prev, activeTab]));
+  }, [activeTab]);
 
   // 未登录时 API 返回 401 则弹出登录框（统一反馈）
   useEffect(() => {
@@ -142,43 +143,62 @@ function AppContent() {
         />
       </div>
 
-      {/* 主内容区 */}
-      <div className="flex-1 overflow-y-auto relative z-10">
-        {activeTab === 'chat' && (
-          <ChatPage
-            initialMessage={initialChatMessage}
-            onInitialMessageConsumed={() => setInitialChatMessage('')}
-            onCreateTicket={handleCreateTicket}
-            userRole={userRole}
-            isLoggedIn={isLoggedIn}
-            onShowLogin={handleShowLogin}
-            onSaveInput={(input: string) => setSavedChatInput(input)}
-          />
-        )}
-        {activeTab === 'knowledge' && (
-          <KnowledgePage />
-        )}
-        {activeTab === 'tickets' && (
-          <TicketsPage
-            onTicketClick={handleTicketClick}
-            onCreateTicket={handleCreateTicket}
-            onGoToChat={() => setActiveTab('chat')}
-            isLoggedIn={isLoggedIn}
-            onShowLogin={handleShowLogin}
-          />
-        )}
-        {activeTab === 'ticket-detail' && selectedTicket && (
-          <TicketDetailPage ticket={selectedTicket} onBack={handleBackFromDetail} />
-        )}
-        {activeTab === 'profile' && (
-          <ProfilePage
-            userRole={userRole}
-            onRoleChange={setUserRole}
-            onLogout={handleLogout}
-            isLoggedIn={isLoggedIn}
-            onShowLogin={handleShowLogin}
-          />
-        )}
+      {/* 主内容区：每个标签首次访问后保持挂载，切换时仅 CSS 隐藏 */}
+      <div className="flex-1 relative z-10 overflow-hidden">
+
+        {/* 问答 */}
+        <div className={`absolute inset-0 ${activeTab === 'chat' ? '' : 'hidden'}`}>
+          {mountedTabs.has('chat') && (
+            <ChatPage
+              initialMessage={initialChatMessage}
+              onInitialMessageConsumed={() => setInitialChatMessage('')}
+              onCreateTicket={handleCreateTicket}
+              userRole={userRole}
+              isLoggedIn={isLoggedIn}
+              onShowLogin={handleShowLogin}
+              onSaveInput={(input: string) => setSavedChatInput(input)}
+            />
+          )}
+        </div>
+
+        {/* 知识库 */}
+        <div className={`absolute inset-0 ${activeTab === 'knowledge' ? '' : 'hidden'}`}>
+          {mountedTabs.has('knowledge') && <KnowledgePage />}
+        </div>
+
+        {/* 工单列表 */}
+        <div className={`absolute inset-0 ${activeTab === 'tickets' ? '' : 'hidden'}`}>
+          {mountedTabs.has('tickets') && (
+            <TicketsPage
+              onTicketClick={handleTicketClick}
+              onCreateTicket={handleCreateTicket}
+              onGoToChat={() => setActiveTab('chat')}
+              isLoggedIn={isLoggedIn}
+              onShowLogin={handleShowLogin}
+            />
+          )}
+        </div>
+
+        {/* 工单详情（依赖 selectedTicket，每次进入时重新渲染保持数据新鲜） */}
+        <div className={`absolute inset-0 ${activeTab === 'ticket-detail' && selectedTicket ? '' : 'hidden'}`}>
+          {activeTab === 'ticket-detail' && selectedTicket && (
+            <TicketDetailPage ticket={selectedTicket} onBack={handleBackFromDetail} />
+          )}
+        </div>
+
+        {/* 个人中心 */}
+        <div className={`absolute inset-0 ${activeTab === 'profile' ? '' : 'hidden'}`}>
+          {mountedTabs.has('profile') && (
+            <ProfilePage
+              userRole={userRole}
+              onRoleChange={setUserRole}
+              onLogout={handleLogout}
+              isLoggedIn={isLoggedIn}
+              onShowLogin={handleShowLogin}
+            />
+          )}
+        </div>
+
       </div>
 
       {/* 登录页面 */}
@@ -253,6 +273,7 @@ export default function App() {
   return (
     <LanguageProvider>
       <AppContent />
+      <Toaster position="bottom-center" richColors toastOptions={{ style: { zIndex: 99999 } }} />
     </LanguageProvider>
   );
 }
