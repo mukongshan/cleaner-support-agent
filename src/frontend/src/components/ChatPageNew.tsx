@@ -42,7 +42,9 @@ import { getToken, API_BASE_URL, getConfirmBeforeDeleteHistory, setConfirmBefore
 import { TicketForm } from './TicketForm';
 // ai_avatar.png 体积过大（7MB+），改用内联 SVG 零加载延迟
 import { useLanguage } from '../contexts/LanguageContext';
+import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { uploadAndRecognizeImage, sendAIMessageWithImage, ImageRecognitionResponse } from '../services/api/imageRecognition';
+import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { ImageWithAuth } from './ImageWithAuth';
 
@@ -433,6 +435,20 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
   const cancelChatRef = useRef<(() => void) | null>(null);
   const activeConvIdRef = useRef<string | null>(null);
   const stepIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const { start: startSpeechRecognition, stop: stopSpeechRecognition, isSupported: isSpeechSupported } = useSpeechRecognition({
+    language,
+    onResult: (text) => setInputText(prev => prev + text),
+    onEnd: () => setIsRecording(false),
+    onError: (err) => {
+      setIsRecording(false);
+      if (err === 'not-allowed') {
+        toast.error(t('voice_permission_denied'));
+      } else if (err === 'network') {
+        toast.error(t('voice_network_error'));
+      }
+    }
+  });
 
   // ── 后台槽位（Background Slot）──────────────────────────────
   // 存储后台继续运行的对话状态，key 为 slotKey（通常等于 sessionId 或 slot-{timestamp}）
@@ -1798,13 +1814,16 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
   };
 
   const handleVoiceRecord = () => {
-    setIsRecording(!isRecording);
-
-    if (!isRecording) {
-      setTimeout(() => {
-        setIsRecording(false);
-        setInputText('机器人的边刷不转了怎么办');
-      }, 2000);
+    if (!isSpeechSupported) {
+      toast.error(t('voice_unsupported'));
+      return;
+    }
+    if (isRecording) {
+      stopSpeechRecognition();
+      setIsRecording(false);
+    } else {
+      startSpeechRecognition();
+      setIsRecording(true);
     }
   };
 
@@ -2909,6 +2928,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
         )}
 
         {/* 输入框和按钮行 */}
+        <div>
         <div
           style={{
             display: 'flex',
@@ -3056,6 +3076,12 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
               )}
             </Tooltip>
           )}
+        </div>
+        {isRecording && (
+          <div style={{ marginTop: '6px', fontSize: '12px', color: '#6b7280' }}>
+            {t('voice_listening')}
+          </div>
+        )}
         </div>
       </div>
     </div>

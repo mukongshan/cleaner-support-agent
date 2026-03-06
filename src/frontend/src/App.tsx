@@ -112,6 +112,7 @@ function AppContent() {
 
   return (
     <div className="h-screen flex flex-col max-w-md mx-auto relative overflow-hidden">
+      <Toaster position="top-center" richColors />
       {/* 全局大气网格背景 */}
       <div
         className="fixed inset-0 z-0"
