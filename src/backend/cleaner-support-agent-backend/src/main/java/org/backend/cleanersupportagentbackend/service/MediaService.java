@@ -44,6 +44,7 @@ public class MediaService {
 
     /**
      * 搜索/获取媒体文件列表
+     * 排除用户在提问中上传的图片（category = user_upload），这些不应展示在知识中心
      */
     public List<MediaFileSummaryResponse> searchFiles(String category, String query) {
         List<MediaFile> files;
@@ -54,6 +55,7 @@ public class MediaService {
         }
         
         return files.stream()
+                .filter(f -> f.getCategory() == null || !"user_upload".equals(f.getCategory()))
                 .map(this::toSummaryResponse)
                 .collect(Collectors.toList());
     }
