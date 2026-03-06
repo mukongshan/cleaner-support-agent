@@ -433,30 +433,21 @@ public class AiService {
         // 创建SSE发射器
         SseEmitter emitter = new SseEmitter(difyConfig.getTimeout());
 
-<<<<<<< HEAD
         // 用于累积AI回复和追踪Dify ID
-=======
->>>>>>> 2229e8a44ef1f7eb074a90465e25c507aa3b2274
         final AtomicReference<StringBuilder> fullAnswerRef = new AtomicReference<>(new StringBuilder());
         final AtomicReference<String> difyConversationIdRef = new AtomicReference<>(conversation.getDifyConversationId());
         final AtomicReference<String> difyMessageIdRef = new AtomicReference<>();
         final Conversation finalConversation = conversation;
-<<<<<<< HEAD
 
         // 使用本地 conversationId 作为任务ID，用于取消 Dify 流（与 chat() 一致）
         final String taskId = finalConversation.getConversationId();
 
         // 设置SSE超时和错误处理：断开时取消 Dify 流，避免继续生成且 message_end 入库
-=======
-        final String taskId = conversation.getConversationId();
-
->>>>>>> 2229e8a44ef1f7eb074a90465e25c507aa3b2274
         emitter.onTimeout(() -> {
             logger.warn("SSE connection timed out for conversation: {}", taskId);
             difyClient.cancelStream(taskId);
             emitter.complete();
         });
-<<<<<<< HEAD
 
         emitter.onError(e -> {
             logger.warn("SSE error for conversation: {}, cancelling Dify stream", taskId, e);
@@ -526,41 +517,6 @@ public class AiService {
                         logger.error("Error completing SSE emitter", e);
                     }
                 }
-=======
-        emitter.onError(e -> {
-            logger.warn("SSE error for conversation: {}, cancelling Dify stream", taskId);
-            difyClient.cancelStream(taskId);
-        });
-
-        difyClient.streamChat(
-            taskId, userId, fullQuery, conversation.getDifyConversationId(),
-            (DifyEvent event) -> {
-                try {
-                    if ("message".equals(event.getEvent())) {
-                        if (event.getAnswer() != null) fullAnswerRef.get().append(event.getAnswer());
-                        if (event.getConversationId() != null && difyConversationIdRef.get() == null)
-                            difyConversationIdRef.set(event.getConversationId());
-                        if (event.getMessageId() != null) difyMessageIdRef.set(event.getMessageId());
-                        sendSseEvent(emitter, event, finalConversation.getConversationId());
-                    } else if ("message_end".equals(event.getEvent())) {
-                        if (event.getConversationId() != null) difyConversationIdRef.set(event.getConversationId());
-                        saveAiResponse(finalConversation, fullAnswerRef.get().toString(),
-                            difyConversationIdRef.get(), difyMessageIdRef.get());
-                        sendSseEvent(emitter, event, finalConversation.getConversationId());
-                    }
-                } catch (Exception e) { logger.error("Error processing Dify event", e); }
-            },
-            (Exception error) -> {
-                logger.error("Dify API error in chatWithImage", error);
-                try { sendErrorEvent(emitter, error.getMessage(), finalConversation.getConversationId()); }
-                catch (Exception e) { logger.error("Error sending error event", e); }
-                emitter.complete();
-            },
-            () -> {
-                try { emitter.complete(); }
-                catch (Exception e) { logger.error("Error completing SSE emitter", e); }
-            }
->>>>>>> 2229e8a44ef1f7eb074a90465e25c507aa3b2274
         );
 
         return emitter;
