@@ -2,7 +2,7 @@
  * HTTP 请求工具
  */
 
-import { API_BASE_URL, getToken, clearToken, ApiResponse, RequestConfig } from './config';
+import { API_BASE_URL, getToken, handleUnauthorized, ApiResponse, RequestConfig } from './config';
 
 /**
  * 统一请求方法
@@ -60,13 +60,11 @@ export async function request<T = any>(
       hasData: !!result.data
     });
 
-    // 处理未登录
+    // 处理未登录：统一走 handleUnauthorized（弹登录框或跳转登录页）
     if (result.code === 401) {
       console.warn('[API Request] 未登录或登录已过期', { url: fullUrl });
-      clearToken();
-      // 可以在这里触发跳转到登录页
-      window.location.href = '/login';
-      throw new Error('未登录或登录已过期');
+      handleUnauthorized();
+      throw new Error('请先登录');
     }
 
     // 处理业务错误

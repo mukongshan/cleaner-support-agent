@@ -31,6 +31,28 @@ export const clearToken = (): void => {
   localStorage.removeItem(USER_INFO_KEY);
 };
 
+/** 未登录时回调（由 App 注册，用于弹出登录框而非跳转） */
+let onUnauthorized: (() => void) | null = null;
+
+/**
+ * 注册未授权回调（如弹出登录框）
+ */
+export function setOnUnauthorized(fn: () => void): void {
+  onUnauthorized = fn;
+}
+
+/**
+ * 未登录/登录过期时统一处理：清除本地登录态并跳转登录（或执行已注册的回调）
+ */
+export function handleUnauthorized(): void {
+  clearToken();
+  if (onUnauthorized) {
+    onUnauthorized();
+  } else {
+    window.location.href = '/login';
+  }
+}
+
 /**
  * 获取存储的用户信息
  */

@@ -3,7 +3,7 @@
  */
 
 import { get, post } from './request';
-import { API_BASE_URL, getToken } from './config';
+import { API_BASE_URL, getToken, handleUnauthorized } from './config';
 
 /**
  * AI 对话请求参数
@@ -91,6 +91,15 @@ export function sendAIMessage(
         const errorText = await response.text();
         console.error('❌ HTTP 错误响应:', errorText);
         throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+      }
+      const contentType = response.headers.get('Content-Type') || '';
+      if (contentType.includes('application/json')) {
+        const json = await response.clone().json();
+        if (json.code === 401) {
+          handleUnauthorized();
+          throw new Error('请先登录');
+        }
+        throw new Error(json.message || '请求失败');
       }
 
       const reader = response.body?.getReader();

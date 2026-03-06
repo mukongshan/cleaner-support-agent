@@ -8,7 +8,7 @@ import { TicketDetailPage } from './components/TicketDetailPage';
 import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
 import { Home as HomeIcon, MessageSquare, User, BookOpen, ClipboardList } from 'lucide-react';
-import { getToken } from './services/api';
+import { getToken, setOnUnauthorized } from './services/api';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 
 type TabType = 'home' | 'chat' | 'knowledge' | 'tickets' | 'profile' | 'ticket-detail';
@@ -30,6 +30,18 @@ function AppContent() {
     const token = getToken();
     setIsLoggedIn(!!token);
   }, []);
+
+  // 未登录时 API 返回 401 则弹出登录框（统一反馈）
+  useEffect(() => {
+    setOnUnauthorized(() => setShowLogin(true));
+  }, []);
+
+  // 问答页需要登录：未登录时进入问答页自动弹出登录框，不能使用问答功能
+  useEffect(() => {
+    if (activeTab === 'chat' && !isLoggedIn) {
+      setShowLogin(true);
+    }
+  }, [activeTab, isLoggedIn]);
 
   const handleOpenChat = (message?: string) => {
     if (message) {
@@ -135,6 +147,7 @@ function AppContent() {
         {activeTab === 'chat' && (
           <ChatPage
             initialMessage={initialChatMessage}
+            onInitialMessageConsumed={() => setInitialChatMessage('')}
             onCreateTicket={handleCreateTicket}
             userRole={userRole}
             isLoggedIn={isLoggedIn}

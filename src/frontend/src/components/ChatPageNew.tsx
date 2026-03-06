@@ -67,6 +67,7 @@ interface ChatSession {
 
 interface ChatPageProps {
   initialMessage?: string;
+  onInitialMessageConsumed?: () => void; // 初始消息已发送后调用，用于清除 App 中的 initialChatMessage，避免切换页面回来后重复发送
   onCreateTicket?: () => void;
   userRole: UserRole;
   isLoggedIn?: boolean;
@@ -275,7 +276,7 @@ function AIMarkdownContent({ content }: { content: string }) {
   );
 }
 
-export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn = false, onShowLogin, onSaveInput }: ChatPageProps) {
+export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTicket, userRole, isLoggedIn = false, onShowLogin, onSaveInput }: ChatPageProps) {
   const { t, language } = useLanguage();
   // 聊天会话管理
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
@@ -1115,6 +1116,15 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
           conversationId: currentSessionId || undefined
         },
         (event) => {
+          // 收到 conversation_id 时立即保存，供终止按钮调用后端 abort 使用
+          if (event.conversation_id && !conversationIdSaved) {
+            conversationIdSaved = true;
+            activeConvIdRef.current = event.conversation_id;
+            setCurrentSessionId(event.conversation_id);
+            console.log('[ChatPage] [发送消息] 保存会话ID（图片对话）', {
+              conversationId: event.conversation_id
+            });
+          }
           if (event.event === 'message' && event.answer) {
             // 累积流式响应内容（event.answer 是增量内容）
             fullAnswer += event.answer;
@@ -1210,6 +1220,13 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
           }
         },
         (error) => {
+          if (error.name === 'AbortError') {
+            clearInterval(stepInterval);
+            setAiThinking(false);
+            cancelChatRef.current = null;
+            activeConvIdRef.current = null;
+            return;
+          }
           console.error('[ChatPage] [发送消息] 图片对话失败', {
             aiMessageId,
             recognitionId,
@@ -1221,6 +1238,8 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
           });
           clearInterval(stepInterval);
           setAiThinking(false);
+          cancelChatRef.current = null;
+          activeConvIdRef.current = null;
           setMessages(prev =>
             prev.map(msg =>
               msg.id === aiMessageId
@@ -1232,8 +1251,13 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
         () => {
           console.log('[ChatPage] [发送消息] 图片对话完成', { aiMessageId });
           clearInterval(stepInterval);
+          cancelChatRef.current = null;
+          activeConvIdRef.current = null;
         }
       );
+
+      // 注册取消函数，供「终止」按钮中断带图对话
+      cancelChatRef.current = cancelFunction;
 
       // 添加AI消息占位
       const aiMessage: Message = {
@@ -1494,6 +1518,8 @@ export function ChatPage({ initialMessage, onCreateTicket, userRole, isLoggedIn 
         setInputText(initialMessage);
         // 自动发送消息
         handleSendMessage(initialMessage);
+        // 立即通知父组件清除 initialMessage，避免切换页面回来后重复发送（如用户终止回答后切走再切回）
+        onInitialMessageConsumed?.();
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -423,18 +423,24 @@ public class AiService {
         final AtomicReference<String> difyMessageIdRef = new AtomicReference<>();
         final Conversation finalConversation = conversation;
 
-        // 设置SSE超时和错误处理
+        // 使用本地 conversationId 作为任务ID，用于取消 Dify 流（与 chat() 一致）
+        final String taskId = finalConversation.getConversationId();
+
+        // 设置SSE超时和错误处理：断开时取消 Dify 流，避免继续生成且 message_end 入库
         emitter.onTimeout(() -> {
-            logger.warn("SSE connection timed out for conversation: {}", finalConversation.getConversationId());
+            logger.warn("SSE connection timed out for conversation: {}", taskId);
+            difyClient.cancelStream(taskId);
             emitter.complete();
         });
 
         emitter.onError(e -> {
-            logger.error("SSE error for conversation: {}", finalConversation.getConversationId(), e);
+            logger.warn("SSE error for conversation: {}, cancelling Dify stream", taskId, e);
+            difyClient.cancelStream(taskId);
         });
 
         // 调用Dify API，使用包含图片描述的完整查询
         difyClient.streamChat(
+                taskId,
                 userId,
                 fullQuery,
                 conversation.getDifyConversationId(),

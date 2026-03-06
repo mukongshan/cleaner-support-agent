@@ -3,7 +3,7 @@
  */
 
 import { get, post } from './request';
-import { API_BASE_URL, getToken } from './config';
+import { API_BASE_URL, getToken, handleUnauthorized } from './config';
 
 /**
  * 图片识别响应
@@ -128,6 +128,10 @@ export async function uploadAndRecognizeImage(
     });
 
     if (result.code !== 200) {
+      if (result.code === 401) {
+        handleUnauthorized();
+        throw new Error('请先登录');
+      }
       console.error('[API] [图片识别] 业务错误', {
         url,
         code: result.code,
@@ -214,6 +218,15 @@ export function sendAIMessageWithImage(
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+      }
+      const contentType = response.headers.get('Content-Type') || '';
+      if (contentType.includes('application/json')) {
+        const json = await response.json();
+        if (json.code === 401) {
+          handleUnauthorized();
+          throw new Error('请先登录');
+        }
+        throw new Error(json.message || '请求失败');
       }
 
       const reader = response.body?.getReader();
