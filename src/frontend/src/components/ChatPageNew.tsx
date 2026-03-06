@@ -44,7 +44,6 @@ import { TicketForm } from './TicketForm';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { uploadAndRecognizeImage, sendAIMessageWithImage, ImageRecognitionResponse } from '../services/api/imageRecognition';
-import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { ImageWithAuth } from './ImageWithAuth';
 
@@ -2929,108 +2928,16 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
 
         {/* 输入框和按钮行 */}
         <div>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'flex-end',
-            gap: '8px'
-          }}
-        >
-          {/* 1. 麦克风按钮 - 固定 40x40 */}
-          <button
-            onClick={handleVoiceRecord}
-            className="haptic-feedback flex-shrink-0"
+          <div
             style={{
-              height: '40px',
-              width: '40px',
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '8px',
-              backgroundColor: isRecording ? '#dc2626' : '#f3f4f6',
-              transition: 'background-color 0.2s'
+              alignItems: 'flex-end',
+              gap: '8px'
             }}
           >
-            <Mic style={{ width: '20px', height: '20px', color: isRecording ? '#fff' : '#4b5563' }} />
-          </button>
-
-          {/* 2. Textarea 容器 - 通过 minHeight 锁定初始高度 */}
-          <div className="flex-1 relative" style={{ minHeight: '40px' }}>
-            <textarea
-              ref={textareaRef}
-              value={inputText}
-              onChange={(e) => {
-                setInputText(e.target.value);
-                if (textareaRef.current) {
-                  textareaRef.current.style.height = '40px'; // 重置回单行高度
-                  textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-                }
-              }}
-              placeholder={t('input_placeholder')}
-              className="focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none overflow-y-auto"
-              style={{
-                width: '100%',
-                padding: '8px 16px',     // 上下各 8px
-                lineHeight: '24px',      // 24px + 8px*2 = 40px
-                minHeight: '40px',
-                maxHeight: '96px',
-                borderRadius: '8px',
-                backgroundColor: '#f3f4f6',
-                border: 'none',
-                display: 'block',
-                boxSizing: 'border-box'  // 极其重要：确保 padding 不增加总高度
-              }}
-              rows={1}
-            />
-          </div>
-
-          {/* 3. 图片按钮 - 固定 40x40 */}
-          <button
-            onClick={() => {
-              // 检查登录状态
-              if (!isLoggedIn) {
-                // 显示登录提示框
-                setShowLoginTip(true);
-                // 2秒后自动隐藏提示框
-                setTimeout(() => {
-                  setShowLoginTip(false);
-                }, 2000);
-                // 跳转到登录页面
-                if (onShowLogin) {
-                  onShowLogin();
-                }
-                return;
-              }
-              fileInputRef.current?.click();
-            }}
-            className="haptic-feedback flex-shrink-0"
-            style={{
-              height: '40px',
-              width: '40px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: '#f3f4f6',
-              borderRadius: '8px'
-            }}
-          >
-            <ImageIcon style={{ width: '20px', height: '20px', color: '#4b5563' }} />
-          </button>
-
-          {/* 隐藏的文件输入 */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/jpg,image/png,image/webp"
-            onChange={handleImageSelect}
-            style={{ display: 'none' }}
-          />
-
-          {/* 4. 发送/停止按钮 - 固定 40x40 */}
-          {aiThinking ? (
-            /* 生成中：显示停止按钮 */
+            {/* 1. 麦克风按钮 - 固定 40x40 */}
             <button
-              onClick={handleStopGeneration}
+              onClick={handleVoiceRecord}
               className="haptic-feedback flex-shrink-0"
               style={{
                 height: '40px',
@@ -3039,49 +2946,141 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderRadius: '8px',
-                backgroundColor: '#2563eb',
-                cursor: 'pointer',
+                backgroundColor: isRecording ? '#dc2626' : '#f3f4f6',
                 transition: 'background-color 0.2s'
               }}
             >
-              <Square style={{ width: '16px', height: '16px', color: '#fff', fill: '#fff' }} />
+              <Mic style={{ width: '20px', height: '20px', color: isRecording ? '#fff' : '#4b5563' }} />
             </button>
-          ) : (
-            /* 空闲中：显示发送按钮 */
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => handleSendMessage(inputText)}
-                  disabled={!canSend()}
-                  className="haptic-feedback flex-shrink-0"
-                  style={{
-                    height: '40px',
-                    width: '40px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderRadius: '8px',
-                    backgroundColor: canSend() ? '#2563eb' : '#e5e7eb',
-                    cursor: canSend() ? 'pointer' : 'not-allowed',
-                    transition: 'background-color 0.2s'
-                  }}
-                >
-                  <Send style={{ width: '20px', height: '20px', color: canSend() ? '#fff' : '#9ca3af' }} />
-                </button>
-              </TooltipTrigger>
-              {!canSend() && getSendButtonTooltip() && (
-                <TooltipContent side="top" className="bg-gray-900 text-white text-xs">
-                  {getSendButtonTooltip()}
-                </TooltipContent>
-              )}
-            </Tooltip>
-          )}
-        </div>
-        {isRecording && (
-          <div style={{ marginTop: '6px', fontSize: '12px', color: '#6b7280' }}>
-            {t('voice_listening')}
+
+            {/* 2. Textarea 容器 - 通过 minHeight 锁定初始高度 */}
+            <div className="flex-1 relative" style={{ minHeight: '40px' }}>
+              <textarea
+                ref={textareaRef}
+                value={inputText}
+                onChange={(e) => {
+                  setInputText(e.target.value);
+                  if (textareaRef.current) {
+                    textareaRef.current.style.height = '40px'; // 重置回单行高度
+                    textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+                  }
+                }}
+                placeholder={t('input_placeholder')}
+                className="focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none overflow-y-auto"
+                style={{
+                  width: '100%',
+                  padding: '8px 16px',     // 上下各 8px
+                  lineHeight: '24px',      // 24px + 8px*2 = 40px
+                  minHeight: '40px',
+                  maxHeight: '96px',
+                  borderRadius: '8px',
+                  backgroundColor: '#f3f4f6',
+                  border: 'none',
+                  display: 'block',
+                  boxSizing: 'border-box'  // 极其重要：确保 padding 不增加总高度
+                }}
+                rows={1}
+              />
+            </div>
+
+            {/* 3. 图片按钮 - 固定 40x40 */}
+            <button
+              onClick={() => {
+                // 检查登录状态
+                if (!isLoggedIn) {
+                  // 显示登录提示框
+                  setShowLoginTip(true);
+                  // 2秒后自动隐藏提示框
+                  setTimeout(() => {
+                    setShowLoginTip(false);
+                  }, 2000);
+                  // 跳转到登录页面
+                  if (onShowLogin) {
+                    onShowLogin();
+                  }
+                  return;
+                }
+                fileInputRef.current?.click();
+              }}
+              className="haptic-feedback flex-shrink-0"
+              style={{
+                height: '40px',
+                width: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#f3f4f6',
+                borderRadius: '8px'
+              }}
+            >
+              <ImageIcon style={{ width: '20px', height: '20px', color: '#4b5563' }} />
+            </button>
+
+            {/* 隐藏的文件输入 */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/webp"
+              onChange={handleImageSelect}
+              style={{ display: 'none' }}
+            />
+
+            {/* 4. 发送/停止按钮 - 固定 40x40 */}
+            {aiThinking ? (
+              /* 生成中：显示停止按钮 */
+              <button
+                onClick={handleStopGeneration}
+                className="haptic-feedback flex-shrink-0"
+                style={{
+                  height: '40px',
+                  width: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '8px',
+                  backgroundColor: '#2563eb',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s'
+                }}
+              >
+                <Square style={{ width: '16px', height: '16px', color: '#fff', fill: '#fff' }} />
+              </button>
+            ) : (
+              /* 空闲中：显示发送按钮 */
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => handleSendMessage(inputText)}
+                    disabled={!canSend()}
+                    className="haptic-feedback flex-shrink-0"
+                    style={{
+                      height: '40px',
+                      width: '40px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: '8px',
+                      backgroundColor: canSend() ? '#2563eb' : '#e5e7eb',
+                      cursor: canSend() ? 'pointer' : 'not-allowed',
+                      transition: 'background-color 0.2s'
+                    }}
+                  >
+                    <Send style={{ width: '20px', height: '20px', color: canSend() ? '#fff' : '#9ca3af' }} />
+                  </button>
+                </TooltipTrigger>
+                {!canSend() && getSendButtonTooltip() && (
+                  <TooltipContent side="top" className="bg-gray-900 text-white text-xs">
+                    {getSendButtonTooltip()}
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            )}
           </div>
-        )}
+          {isRecording && (
+            <div style={{ marginTop: '6px', fontSize: '12px', color: '#6b7280' }}>
+              {t('voice_listening')}
+            </div>
+          )}
         </div>
       </div>
     </div>
