@@ -12,6 +12,9 @@ export const USER_INFO_KEY = 'user_info';
 /** 删除历史对话前是否弹出确认（localStorage 键） */
 export const CONFIRM_BEFORE_DELETE_HISTORY_KEY = 'confirm_before_delete_history';
 
+/** 用户身份（localStorage 键）：dealer | enduser */
+export const USER_ROLE_KEY = 'user_role';
+
 /** 获取「删除历史对话前确认」设置，默认 true（显示确认弹窗） */
 export function getConfirmBeforeDeleteHistory(): boolean {
   const v = localStorage.getItem(CONFIRM_BEFORE_DELETE_HISTORY_KEY);
@@ -22,6 +25,17 @@ export function getConfirmBeforeDeleteHistory(): boolean {
 /** 设置「删除历史对话前确认」 */
 export function setConfirmBeforeDeleteHistory(value: boolean): void {
   localStorage.setItem(CONFIRM_BEFORE_DELETE_HISTORY_KEY, String(value));
+}
+
+/** 获取存储的用户身份，默认 enduser */
+export function getStoredUserRole(): 'dealer' | 'enduser' | null {
+  const v = localStorage.getItem(USER_ROLE_KEY);
+  return v === 'dealer' || v === 'enduser' ? v : null;
+}
+
+/** 设置「用户身份」 */
+export function setStoredUserRole(role: 'dealer' | 'enduser'): void {
+  localStorage.setItem(USER_ROLE_KEY, role);
 }
 
 /**

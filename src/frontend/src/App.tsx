@@ -9,7 +9,7 @@ import { TicketDetailPage } from './components/TicketDetailPage';
 import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
 import { Home as HomeIcon, MessageSquare, User, BookOpen, ClipboardList } from 'lucide-react';
-import { getToken, setOnUnauthorized } from './services/api';
+import { getToken, setOnUnauthorized, getStoredUserRole, setStoredUserRole } from './services/api';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 
 type TabType = 'home' | 'chat' | 'knowledge' | 'tickets' | 'profile' | 'ticket-detail';
@@ -23,7 +23,7 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState<TabType>('chat'); // 默认显示问答界面
   const [initialChatMessage, setInitialChatMessage] = useState<string>('');
   const [savedChatInput, setSavedChatInput] = useState<string>(''); // 保存用户输入的问题
-  const [userRole, setUserRole] = useState<UserRole>('enduser'); // 默认终端用户
+  const [userRole, setUserRole] = useState<UserRole>(() => getStoredUserRole() ?? 'enduser');
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
   // 记录哪些标签已被访问过（懒加载：首次访问才挂载，之后保持挂载不再销毁）
@@ -98,6 +98,11 @@ function AppContent() {
   const handleShowRegister = () => {
     setShowRegister(true);
     setShowLogin(false);
+  };
+
+  const handleRoleChange = (role: UserRole) => {
+    setUserRole(role);
+    setStoredUserRole(role);
   };
 
   const handleSwitchToRegister = () => {
@@ -209,7 +214,7 @@ function AppContent() {
           {mountedTabs.has('profile') && (
             <ProfilePage
               userRole={userRole}
-              onRoleChange={setUserRole}
+              onRoleChange={handleRoleChange}
               onLogout={handleLogout}
               isLoggedIn={isLoggedIn}
               onShowLogin={handleShowLogin}
