@@ -2,7 +2,7 @@
  * AI 智能问答相关 API
  */
 
-import { get, post } from './request';
+import { get, post, del } from './request';
 import { API_BASE_URL, getToken, handleUnauthorized } from './config';
 
 /**
@@ -209,4 +209,11 @@ export async function getConversations(): Promise<Conversation[]> {
 export async function getConversationDetail(conversationId: string): Promise<ConversationDetail> {
   const response = await get<ConversationDetail>(`/ai/conversations/${conversationId}`);
   return response.data;
+}
+
+/**
+ * 删除历史会话（删除后数据不可恢复）
+ */
+export async function deleteConversation(conversationId: string): Promise<void> {
+  await del(`/ai/conversations/${conversationId}`);
 }

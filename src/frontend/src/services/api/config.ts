@@ -9,6 +9,21 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localho
 export const TOKEN_KEY = 'auth_token';
 export const USER_INFO_KEY = 'user_info';
 
+/** 删除历史对话前是否弹出确认（localStorage 键） */
+export const CONFIRM_BEFORE_DELETE_HISTORY_KEY = 'confirm_before_delete_history';
+
+/** 获取「删除历史对话前确认」设置，默认 true（显示确认弹窗） */
+export function getConfirmBeforeDeleteHistory(): boolean {
+  const v = localStorage.getItem(CONFIRM_BEFORE_DELETE_HISTORY_KEY);
+  if (v === null) return true;
+  return v === 'true';
+}
+
+/** 设置「删除历史对话前确认」 */
+export function setConfirmBeforeDeleteHistory(value: boolean): void {
+  localStorage.setItem(CONFIRM_BEFORE_DELETE_HISTORY_KEY, String(value));
+}
+
 /**
  * 获取存储的 Token
  */

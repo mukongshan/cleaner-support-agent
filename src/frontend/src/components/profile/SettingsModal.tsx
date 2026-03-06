@@ -1,14 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   User,
   ChevronRight,
   Globe,
   Info,
   LogOut,
-  ArrowLeft
+  ArrowLeft,
+  Trash2,
+  Settings
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { getConfirmBeforeDeleteHistory, setConfirmBeforeDeleteHistory } from '../../services/api/config';
+import { Switch } from '../ui/switch';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -29,9 +33,23 @@ export function SettingsModal({
 }: SettingsModalProps) {
   const { language, t } = useLanguage();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const[showGeneralPage, setShowGeneralPage] = useState(false);
+  const[confirmBeforeDeleteHistory, setConfirmBeforeDeleteHistoryState] = useState(true);
 
-  // 注意：不在这里返回 null，让父组件的 AnimatePresence 处理显示/隐藏
-  // if (!isOpen) return null; // 已移除，由 AnimatePresence 控制
+  useEffect(() => {
+    setConfirmBeforeDeleteHistoryState(getConfirmBeforeDeleteHistory());
+  }, [isOpen, showGeneralPage]);
+
+  // 整行点击时的切换逻辑
+  const handleRowClick = () => {
+    const newValue = !confirmBeforeDeleteHistory;
+    setConfirmBeforeDeleteHistoryState(newValue);
+    setConfirmBeforeDeleteHistory(newValue);
+  };
+
+  const handleBackFromGeneral = () => {
+    setShowGeneralPage(false);
+  };
 
   return (
     <motion.div
@@ -63,12 +81,14 @@ export function SettingsModal({
         {/* 设置页头部 */}
         <div className="bg-white px-4 py-3 shadow-sm flex items-center gap-3">
           <button
-            onClick={onClose}
+            onClick={showGeneralPage ? handleBackFromGeneral : onClose}
             className="p-2 -ml-2 hover:bg-gray-100 rounded-lg transition-colors haptic-feedback"
           >
             <ArrowLeft className="w-5 h-5 text-gray-700" />
           </button>
-          <h2 className="text-lg font-semibold text-gray-900">{t('settings')}</h2>
+          <h2 className="text-lg font-semibold text-gray-900">
+            {showGeneralPage ? t('settings_general') : t('settings')}
+          </h2>
         </div>
 
         {/* 设置内容 */}
@@ -80,6 +100,64 @@ export function SettingsModal({
             padding: '1rem'
           }}
         >
+        {showGeneralPage ? (
+          /* 通用页 */
+          <div className="rounded-2xl overflow-hidden"
+            style={{
+              backdropFilter: 'blur(8px)',
+              backgroundColor: 'rgba(255, 255, 255, 0.8)',
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+            }}
+          >
+            {/* 点击整行切换 */}
+            <div
+              onClick={handleRowClick}
+              className="hover:bg-gray-50 transition-colors cursor-pointer haptic-feedback"
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '1rem'
+              }}
+            >
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5 text-orange-600" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-gray-900">{t('settings_confirm_before_delete_history')}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {t('settings_confirm_before_delete_history_desc')}
+                  </div>
+                </div>
+              </div>
+              
+              {/* 开关操作区 */}
+              <div 
+                className="flex items-center gap-3 shrink-0 ml-3"
+                onClick={(e) => e.stopPropagation()} // 重要：拦截点击事件，防止穿透到外层 div 引起双重切换（即点完没反应的根本原因）
+              >
+                <span className={`text-sm font-medium transition-colors ${confirmBeforeDeleteHistory ? 'text-blue-600' : 'text-gray-400'}`}>
+                  {confirmBeforeDeleteHistory ? (language === 'en' ? 'On' : '已开启') : (language === 'en' ? 'Off' : '已关闭')}
+                </span>
+                
+                {/* 恢复并美化了第三方组件 */}
+                <Switch
+                  checked={confirmBeforeDeleteHistory}
+                  onCheckedChange={(checked) => {
+                    setConfirmBeforeDeleteHistoryState(checked);
+                    setConfirmBeforeDeleteHistory(checked);
+                  }}
+                  /* 强制指定开启为蓝，关闭为明显的深灰色(gray-300)，确保不会在白底上消失 */
+                  className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-gray-300 shadow-sm transition-colors"
+                />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+          {/* ----- 以下个人信息、语言设置等代码保持完全不变 ----- */}
           {/* 个人信息 - 仅登录后显示 */}
           {isLoggedIn && (
             <div 
@@ -142,6 +220,36 @@ export function SettingsModal({
                     {language === 'zh' ? '简体中文' : 'English'}
                   </div>
                 </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-400" />
+            </button>
+          </div>
+
+          {/* 通用 */}
+          <div 
+            className="rounded-2xl overflow-hidden mb-4"
+            style={{
+              backdropFilter: 'blur(8px)',
+              backgroundColor: 'rgba(255, 255, 255, 0.8)',
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+            }}
+          >
+            <button
+              onClick={() => setShowGeneralPage(true)}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '1rem'
+              }}
+              className="hover:bg-gray-50 transition-colors haptic-feedback"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                  <Settings className="w-5 h-5 text-gray-600" />
+                </div>
+                <span className="text-sm font-medium text-gray-900">{t('settings_general')}</span>
               </div>
               <ChevronRight className="w-5 h-5 text-gray-400" />
             </button>
@@ -272,6 +380,8 @@ export function SettingsModal({
               </motion.div>
             )}
           </AnimatePresence>
+          </>
+        )}
         </div>
     </motion.div>
   );

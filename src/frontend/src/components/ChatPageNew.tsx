@@ -21,7 +21,8 @@ import {
   RotateCcw,
   ChevronDown,
   Brain,
-  Square
+  Square,
+  Trash2
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -32,11 +33,12 @@ import {
   stopAIMessage,
   getConversations,
   getConversationDetail,
+  deleteConversation as apiDeleteConversation,
   createTicket,
   Conversation,
   ConversationDetail
 } from '../services/api';
-import { getToken, API_BASE_URL } from '../services/api/config';
+import { getToken, API_BASE_URL, getConfirmBeforeDeleteHistory, setConfirmBeforeDeleteHistory } from '../services/api/config';
 import { TicketForm } from './TicketForm';
 // ai_avatar.png 体积过大（7MB+），改用内联 SVG 零加载延迟
 import { useLanguage } from '../contexts/LanguageContext';
@@ -300,6 +302,8 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
   const [thinkingStep, setThinkingStep] = useState(0);
   const [showNewChatDialog, setShowNewChatDialog] = useState(false);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+  const [deleteConfirmSession, setDeleteConfirmSession] = useState<ChatSession | null>(null);
+  const [deleteConfirmDontShowAgain, setDeleteConfirmDontShowAgain] = useState(false);
   const [showTicketPrompt, setShowTicketPrompt] = useState(false);
   const [ticketCreated, setTicketCreated] = useState(false);
   const [showTicketForm, setShowTicketForm] = useState(false);
@@ -1599,6 +1603,12 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
   };
 
   const confirmNewChat = () => {
+    resetToNewChat();
+    setShowNewChatDialog(false);
+  };
+
+  /** 重置为“新对话”状态（用于新建对话或删除当前会话后） */
+  const resetToNewChat = () => {
     setMessages([
       {
         id: Date.now().toString(),
@@ -1607,13 +1617,46 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
         timestamp: new Date()
       }
     ]);
-    // 重置会话ID，下次发送消息时将创建新会话
     setCurrentSessionId(null);
     setTicketCreated(false);
-    setShowTicketPrompt(false); // 重置工单提示关闭状态
-    setIsHistoryConversation(false); // 重置为非历史对话
-    setShowNewChatDialog(false);
-    setHasCreatedNewChat(true); // 标记已创建过新对话
+    setShowTicketPrompt(false);
+    setIsHistoryConversation(false);
+    setHasCreatedNewChat(true);
+  };
+
+  /** 执行删除会话：调用接口、刷新列表，若删除的是当前会话则重置为新对话 */
+  const doDeleteConversation = async (sessionId: string) => {
+    await apiDeleteConversation(sessionId);
+    await loadHistoryConversations();
+    if (currentSessionId === sessionId) {
+      resetToNewChat();
+    }
+  };
+
+  /** 点击历史项删除按钮：根据设置决定直接删除或弹出确认框 */
+  const handleDeleteSession = (e: React.MouseEvent, session: ChatSession) => {
+    e.stopPropagation();
+    if (!getConfirmBeforeDeleteHistory()) {
+      doDeleteConversation(session.id).catch((err) => {
+        console.error('删除会话失败:', err);
+      });
+      return;
+    }
+    setDeleteConfirmSession(session);
+    setDeleteConfirmDontShowAgain(false);
+  };
+
+  /** 确认删除弹窗中点击“确认删除” */
+  const confirmDeleteSession = () => {
+    if (!deleteConfirmSession) return;
+    if (deleteConfirmDontShowAgain) {
+      setConfirmBeforeDeleteHistory(false);
+    }
+    const id = deleteConfirmSession.id;
+    setDeleteConfirmSession(null);
+    doDeleteConversation(id).catch((err) => {
+      console.error('删除会话失败:', err);
+    });
   };
 
   // 智能提取聊天信息
@@ -2279,29 +2322,91 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
                 ) : (
                   <div className="space-y-2">
                     {chatSessions.map((session) => (
-                      <button
+                      <div
                         key={session.id}
-                        onClick={() => {
-                          loadConversationDetail(session.id);
-                          setShowHistoryDialog(false);
-                        }}
-                        className="w-full bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-400 hover:bg-blue-50 transition-all text-left haptic-feedback"
+                        className="flex items-center gap-2 w-full bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-blue-400 hover:bg-blue-50 transition-all group"
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-gray-900 mb-1 truncate">
-                              {session.title}
-                            </h4>
-                            <div className="flex items-center gap-2 text-xs text-gray-500">
-                              <Clock className="w-3 h-3" />
-                              <span>{session.createdAt.toLocaleDateString('zh-CN')}</span>
-                            </div>
+                        <button
+                          onClick={() => {
+                            loadConversationDetail(session.id);
+                            setShowHistoryDialog(false);
+                          }}
+                          className="flex-1 min-w-0 p-4 text-left haptic-feedback"
+                        >
+                          <h4 className="font-medium text-gray-900 mb-1 truncate">
+                            {session.title}
+                          </h4>
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <Clock className="w-3 h-3" />
+                            <span>{session.createdAt.toLocaleDateString('zh-CN')}</span>
                           </div>
-                        </div>
-                      </button>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteSession(e, session)}
+                          className="p-2 mr-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors haptic-feedback shrink-0"
+                          title={t('delete')}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 删除历史对话确认弹窗 */}
+      <AnimatePresence>
+        {deleteConfirmSession && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={() => setDeleteConfirmSession(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl p-6 max-w-sm w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center mb-4">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Trash2 className="w-8 h-8 text-red-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('delete_history_confirm_title')}</h3>
+                <p className="text-sm text-gray-600">
+                  {t('delete_history_confirm_desc')}
+                </p>
+              </div>
+              <label className="flex items-center gap-2 mb-6 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={deleteConfirmDontShowAgain}
+                  onChange={(e) => setDeleteConfirmDontShowAgain(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-600">{t('dont_show_again')}</span>
+              </label>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteConfirmSession(null)}
+                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors haptic-feedback"
+                >
+                  {t('cancel')}
+                </button>
+                <button
+                  onClick={confirmDeleteSession}
+                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors haptic-feedback"
+                >
+                  {t('confirm_delete_history')}
+                </button>
               </div>
             </motion.div>
           </motion.div>

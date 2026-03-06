@@ -10,4 +10,6 @@ import java.util.List;
 @Repository
 public interface MessageRepository extends JpaRepository<Message, Long> {
     List<Message> findByConversationOrderByTimestampAsc(Conversation conversation);
+
+    void deleteByConversation(Conversation conversation);
 }

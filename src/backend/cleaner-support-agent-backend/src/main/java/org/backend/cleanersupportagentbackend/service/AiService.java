@@ -357,6 +357,22 @@ public class AiService {
     }
 
     /**
+     * 删除会话及其所有消息（仅允许删除当前用户的会话）
+     */
+    @Transactional
+    public void deleteConversation(String userId, String conversationId) {
+        User user = userService.getUserByUserId(userId);
+        Conversation conversation = conversationRepository.findByConversationId(conversationId)
+                .orElseThrow(() -> new RuntimeException("会话不存在"));
+        if (!conversation.getUser().getId().equals(user.getId())) {
+            throw new RuntimeException("无权删除该会话");
+        }
+        messageRepository.deleteByConversation(conversation);
+        conversationRepository.delete(conversation);
+        logger.info("Deleted conversation {} for user {}", conversationId, userId);
+    }
+
+    /**
      * 基于图片识别结果进行AI对话
      */
     @Transactional

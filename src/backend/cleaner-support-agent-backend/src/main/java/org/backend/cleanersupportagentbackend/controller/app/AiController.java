@@ -72,4 +72,19 @@ public class AiController {
             return ResponseEntity.ok(ApiResponse.error(500, e.getMessage()));
         }
     }
+
+    /**
+     * 删除历史会话（仅限当前用户自己的会话，删除后数据不可恢复）
+     */
+    @DeleteMapping("/conversations/{conversationId}")
+    public ResponseEntity<ApiResponse<Void>> deleteConversation(
+            @CurrentUserId String userId,
+            @PathVariable String conversationId) {
+        try {
+            aiService.deleteConversation(userId, conversationId);
+            return ResponseEntity.ok(ApiResponse.success(null));
+        } catch (Exception e) {
+            return ResponseEntity.ok(ApiResponse.error(500, e.getMessage()));
+        }
+    }
 }

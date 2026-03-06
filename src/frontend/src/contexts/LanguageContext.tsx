@@ -33,6 +33,12 @@ const translations = {
     loading_conversation: '加载对话记录中...',
     no_history: '暂无历史对话记录',
     loading_history: '加载历史对话...',
+    delete_history_confirm_title: '删除历史对话',
+    delete_history_confirm_desc: '删除后数据不可恢复，确定要删除该对话吗？',
+    dont_show_again: '不再提示',
+    confirm_delete_history: '确认删除',
+    settings_confirm_before_delete_history: '删除历史对话前确认',
+    settings_confirm_before_delete_history_desc: '关闭后删除时将不再弹出确认窗口',
     continue_asking: '继续问我',
     refresh_questions: '换一换',
     problem_solved: '问题解决了吗？',
@@ -57,6 +63,7 @@ const translations = {
 
     // Profile Page
     settings: '设置',
+    settings_general: '通用',
     language: '语言',
     language_setting: '语言设置',
     chinese: '简体中文',
@@ -120,6 +127,12 @@ const translations = {
     loading_conversation: 'Loading conversation...',
     no_history: 'No conversation history',
     loading_history: 'Loading history...',
+    delete_history_confirm_title: 'Delete conversation',
+    delete_history_confirm_desc: 'Data cannot be recovered after deletion. Are you sure?',
+    dont_show_again: "Don't show again",
+    confirm_delete_history: 'Delete',
+    settings_confirm_before_delete_history: 'Confirm before deleting history',
+    settings_confirm_before_delete_history_desc: 'When off, deletion will not show a confirmation dialog',
     continue_asking: 'Continue Asking',
     refresh_questions: 'Refresh',
     problem_solved: 'Problem Solved?',
@@ -144,6 +157,7 @@ const translations = {
 
     // Profile Page
     settings: 'Settings',
+    settings_general: 'General',
     language: 'Language',
     language_setting: 'Language Settings',
     chinese: '简体中文',
