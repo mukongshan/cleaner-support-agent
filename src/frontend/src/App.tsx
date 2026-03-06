@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Toaster } from 'sonner';
 import { Home } from './components/Home';
 import { ChatPage } from './components/ChatPageNew';
 import { ProfilePage } from './components/ProfilePageNew';
@@ -111,6 +112,7 @@ function AppContent() {
 
   return (
     <div className="h-screen flex flex-col max-w-md mx-auto relative overflow-hidden">
+      <Toaster position="top-center" richColors />
       {/* 全局大气网格背景 */}
       <div
         className="fixed inset-0 z-0"

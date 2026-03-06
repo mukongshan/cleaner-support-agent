@@ -93,6 +93,12 @@ const translations = {
     login_required: '去登录',
     login_desc: '登录后享受完整服务',
 
+    // Voice input
+    voice_unsupported: '当前浏览器不支持语音输入，请使用 Chrome 或 Edge',
+    voice_permission_denied: '麦克风权限被拒绝',
+    voice_network_error: '请检查网络连接',
+    voice_listening: '正在聆听...',
+
     // Common
     close: '关闭',
     save: '保存',
@@ -186,6 +192,12 @@ const translations = {
     phone_number_cannot_change: 'Phone number cannot be changed directly',
     login_required: 'Login',
     login_desc: 'Login to enjoy full service',
+
+    // Voice input
+    voice_unsupported: 'Voice input is not supported. Please use Chrome or Edge',
+    voice_permission_denied: 'Microphone permission denied',
+    voice_network_error: 'Please check your network connection',
+    voice_listening: 'Listening...',
 
     // Common
     close: 'Close',
