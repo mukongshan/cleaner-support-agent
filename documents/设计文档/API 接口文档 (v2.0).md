@@ -227,6 +227,36 @@ data: {"event": "message_end", "metadata": {"retriever_resources": [...]}}
   - `mediaFileId`: 关联的媒体文件业务ID，可调用媒体文件接口获取图片
   - `imageUrl`: 图片URL，可直接展示
 
+### 2.5 停止流式对话生成
+
+- **请求方法:** POST
+- **请求路径:** `/ai/conversations/{conversationId}/abort`
+- **请求头:** `Authorization: Bearer <token>`
+- **说明:** 主动终止指定会话的流式生成。前端在用户点击"停止"时调用，后端立即中断对 Dify 的 HTTP 连接。
+- **响应示例:**
+
+```json
+{
+  "code": 200,
+  "message": "对话已停止"
+}
+```
+
+### 2.6 删除历史会话
+
+- **请求方法:** DELETE
+- **请求路径:** `/ai/conversations/{conversationId}`
+- **请求头:** `Authorization: Bearer <token>`
+- **说明:** 删除历史会话（仅限当前用户自己的会话，删除后数据不可恢复）
+- **响应示例:**
+
+```json
+{
+  "code": 200,
+  "message": "会话已删除"
+}
+```
+
 ------
 
 ## 3. 工单管理接口 (Tickets)
