@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Loader, Sparkles, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export interface TicketFormData {
   problemType: string;
@@ -35,17 +36,18 @@ export function TicketForm({
   onAIAssist,
   aiAssisting = false
 }: TicketFormProps) {
+  const { t } = useLanguage();
   const problemTypes = [
-    { value: 'malfunction', label: '设备故障' },
-    { value: 'maintenance', label: '维护保养' },
-    { value: 'consultation', label: '使用咨询' },
-    { value: 'parts', label: '配件需求' }
+    { value: 'malfunction', label: t('ticket_type_malfunction') },
+    { value: 'maintenance', label: t('ticket_type_maintenance') },
+    { value: 'consultation', label: t('ticket_type_consultation') },
+    { value: 'parts', label: t('ticket_type_parts') }
   ];
 
   const priorities = [
-    { value: 'low' as const, label: '低', color: 'gray' },
-    { value: 'medium' as const, label: '中', color: 'blue' },
-    { value: 'high' as const, label: '高', color: 'red' }
+    { value: 'low' as const, label: t('priority_low'), color: 'gray' },
+    { value: 'medium' as const, label: t('priority_medium'), color: 'blue' },
+    { value: 'high' as const, label: t('priority_high'), color: 'red' }
   ];
 
   const updateFormData = (field: keyof TicketFormData, value: any) => {
@@ -71,7 +73,7 @@ export function TicketForm({
         >
           {/* 头部 */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">创建服务工单</h3>
+            <h3 className="text-lg font-semibold text-gray-900">{t('ticket_form_title')}</h3>
             <button
               onClick={onCancel}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -91,12 +93,12 @@ export function TicketForm({
                 {aiAssisting ? (
                   <>
                     <Loader className="w-5 h-5 animate-spin" />
-                    <span>AI 分析中...</span>
+                    <span>{t('ticket_ai_assisting')}</span>
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-5 h-5" />
-                    <span>AI 辅助填写</span>
+                    <span>{t('ticket_ai_assist_fill')}</span>
                   </>
                 )}
               </button>
@@ -109,7 +111,7 @@ export function TicketForm({
               {/* 问题类型 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  问题类型
+                  {t('ticket_problem_type_label')}
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {problemTypes.map((type) => (
@@ -130,7 +132,7 @@ export function TicketForm({
               {/* 优先级 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  优先级
+                  {t('ticket_priority_label')}
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   {priorities.map((priority) => (
@@ -155,13 +157,13 @@ export function TicketForm({
               {/* 问题摘要 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  问题摘要
+                  {t('ticket_problem_summary')}
                 </label>
                 <input
                   type="text"
                   value={formData.problemSummary}
                   onChange={(e) => updateFormData('problemSummary', e.target.value)}
-                  placeholder="简要描述问题..."
+                  placeholder={t('ticket_problem_summary_placeholder')}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
               </div>
@@ -170,7 +172,7 @@ export function TicketForm({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    设备型号
+                    {t('ticket_device_model_label')}
                   </label>
                   <input
                     type="text"
@@ -181,7 +183,7 @@ export function TicketForm({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    设备 SN 码
+                    {t('ticket_device_sn_input')}
                   </label>
                   <input
                     type="text"
@@ -195,14 +197,14 @@ export function TicketForm({
               {/* 补充说明 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  补充说明（选填）
+                  {t('ticket_additional_notes_optional')}
                 </label>
                 <textarea
                   value={formData.additionalNotes}
                   onChange={(e) => updateFormData('additionalNotes', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none"
                   rows={3}
-                  placeholder="补充其他信息..."
+                  placeholder={t('ticket_additional_notes_placeholder')}
                 />
               </div>
 
@@ -211,10 +213,10 @@ export function TicketForm({
                 <div className="flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
                   <div className="text-xs text-blue-800">
-                    <p className="font-medium mb-1">提交后将包含：</p>
+                    <p className="font-medium mb-1">{t('ticket_submit_includes')}</p>
                     <ul className="space-y-0.5">
-                      <li>• 问题详细描述</li>
-                      <li>• 设备信息和故障时间</li>
+                      <li>• {t('ticket_submit_item_problem_desc')}</li>
+                      <li>• {t('ticket_submit_item_device_info')}</li>
                     </ul>
                   </div>
                 </div>
@@ -237,10 +239,10 @@ export function TicketForm({
               {submitting ? (
                 <>
                   <Loader className="w-5 h-5 animate-spin" />
-                  <span>创建中...</span>
+                  <span>{t('ticket_creating')}</span>
                 </>
               ) : (
-                <span>确认创建工单</span>
+                <span>{t('ticket_confirm_create')}</span>
               )}
             </button>
           </div>

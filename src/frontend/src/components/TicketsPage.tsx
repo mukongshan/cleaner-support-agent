@@ -61,7 +61,7 @@ interface TicketsPageProps {
 }
 
 export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat, isLoggedIn = false, onShowLogin }: TicketsPageProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [selectedFilter, setSelectedFilter] = useState<'all' | TicketStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [ticketFeedbacks, setTicketFeedbacks] = useState<Record<string, 'like' | 'dislike' | null>>({});
@@ -207,7 +207,7 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat, isLogge
         borderColor: 'border-green-200'
       },
       cancelled: {
-        label: '已取消',
+        label: t('cancelled'),
         color: 'text-gray-600 bg-gray-50',
         icon: XCircle,
         borderColor: 'border-gray-200'
@@ -218,9 +218,9 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat, isLogge
 
   const getPriorityInfo = (priority: string) => {
     const priorityMap = {
-      high: { label: '高', color: 'text-red-600 bg-red-50' },
-      medium: { label: '中', color: 'text-orange-600 bg-orange-50' },
-      low: { label: '低', color: 'text-gray-600 bg-gray-50' }
+      high: { label: t('priority_high'), color: 'text-red-600 bg-red-50' },
+      medium: { label: t('priority_medium'), color: 'text-orange-600 bg-orange-50' },
+      low: { label: t('priority_low'), color: 'text-gray-600 bg-gray-50' }
     };
     return priorityMap[priority as keyof typeof priorityMap];
   };
@@ -244,19 +244,19 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat, isLogge
 
   const getProblemTypeLabel = (type: string) => {
     const typeMap: { [key: string]: string } = {
-      malfunction: '设备故障',
-      maintenance: '维护保养',
-      consultation: '使用咨询',
-      parts: '配件需求'
+      malfunction: t('ticket_type_malfunction'),
+      maintenance: t('ticket_type_maintenance'),
+      consultation: t('ticket_type_consultation'),
+      parts: t('ticket_type_parts')
     };
-    return typeMap[type] || '其他';
+    return typeMap[type] || t('all');
   };
 
   const getPriorityLabel = (priority: 'low' | 'medium' | 'high') => {
     const priorityMap = {
-      low: '低',
-      medium: '中',
-      high: '高'
+      low: t('priority_low'),
+      medium: t('priority_medium'),
+      high: t('priority_high')
     };
     return priorityMap[priority];
   };
@@ -299,8 +299,8 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat, isLogge
 
       // 创建工单
       const result = await createTicket({
-        title: ticketFormData.problemSummary || '工单',
-        description: `问题类型: ${ticketFormData.problemType}\n设备型号: ${ticketFormData.deviceModel}\n设备SN: ${ticketFormData.deviceSN}\n\n${ticketFormData.additionalNotes}`,
+        title: ticketFormData.problemSummary || t('ticket_create_default_title'),
+        description: `${t('ticket_problem_type_label')}: ${ticketFormData.problemType}\n${t('ticket_device_model_label')}: ${ticketFormData.deviceModel}\n${t('ticket_device_sn_label')}: ${ticketFormData.deviceSN}\n\n${ticketFormData.additionalNotes}`,
         priority: ticketFormData.priority as TicketPriority,
         attachmentUrls: uploadedUrls.length > 0 ? uploadedUrls : undefined
       });
@@ -328,7 +328,7 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat, isLogge
       }
     } catch (err: any) {
       console.error('创建工单失败:', err);
-      setError(err.message || '创建工单失败');
+      setError(err.message || t('ticket_create_failed'));
     } finally {
       setSubmitting(false);
     }
@@ -355,13 +355,13 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat, isLogge
             <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center mb-6">
               <ClipboardList className="w-12 h-12 text-gray-400" />
             </div>
-            <p className="text-gray-600 text-sm mb-6">请登录后使用工单功能</p>
+            <p className="text-gray-600 text-sm mb-6">{t('ticket_not_login_hint')}</p>
             {onShowLogin && (
               <button
                 onClick={onShowLogin}
                 className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors haptic-feedback"
               >
-                去登录
+                {t('login_required')}
               </button>
             )}
           </div>
@@ -458,196 +458,196 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat, isLogge
           {/* 工单列表 */}
           <div className="flex-1 overflow-y-auto px-4 py-4 relative z-0">
             {loading ? (
-          <div className="flex flex-col items-center justify-center h-full text-center px-8">
-            <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
-            <p className="text-sm text-gray-500">加载中...</p>
-          </div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center h-full text-center px-8">
-            <div className="w-24 h-24 bg-red-50 rounded-full flex items-center justify-center mb-4">
-              <AlertCircle className="w-12 h-12 text-red-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">加载失败</h3>
-            <p className="text-sm text-gray-500 mb-4">{error}</p>
-            <button
-              onClick={loadTickets}
-              className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
-            >
-              重试
-            </button>
-          </div>
-        ) : filteredTickets.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center px-8">
-            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-              <FileText className="w-12 h-12 text-gray-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">暂无工单记录</h3>
-            <p className="text-sm text-gray-500">
-              {searchQuery ? '未找到匹配的工单' : '遇到问题时，AI助手会为您创建工单'}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filteredTickets.map((ticket, index) => {
-              const statusInfo = getStatusInfo(ticket.status);
-              const priorityInfo = getPriorityInfo(ticket.priority);
-              const StatusIcon = statusInfo.icon;
-
-              const handleCardClick = (e: React.MouseEvent) => {
-                e.stopPropagation();
-                if (onTicketClick) {
-                  onTicketClick(ticket);
-                }
-              };
-
-              const handleFeedbackClick = (e: React.MouseEvent, type: 'like' | 'dislike') => {
-                e.stopPropagation();
-                setTicketFeedbacks(prev => ({
-                  ...prev,
-                  [ticket.id]: prev[ticket.id] === type ? null : type
-                }));
-              };
-
-              const currentFeedback = ticketFeedbacks[ticket.id] || null;
-
-              return (
-                <motion.div
-                  key={ticket.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className={`w-full rounded-xl p-4 transition-all border-l-4 ${statusInfo.borderColor}`}
-                  style={{
-                    backdropFilter: 'blur(8px)',
-                    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
-                  }}
+              <div className="flex flex-col items-center justify-center h-full text-center px-8">
+                <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
+                <p className="text-sm text-gray-500">{t('loading')}</p>
+              </div>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center h-full text-center px-8">
+                <div className="w-24 h-24 bg-red-50 rounded-full flex items-center justify-center mb-4">
+                  <AlertCircle className="w-12 h-12 text-red-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('error')}</h3>
+                <p className="text-sm text-gray-500 mb-4">{error}</p>
+                <button
+                  onClick={loadTickets}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
                 >
-                  <button
-                    onClick={handleCardClick}
-                    className="w-full text-left haptic-feedback"
-                  >
-                    {/* 头部 */}
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold text-gray-900 text-sm">{ticket.title}</h3>
-                          {ticket.hasImage && (
-                            <Camera className="w-4 h-4 text-gray-400" />
+                  {t('retry')}
+                </button>
+              </div>
+            ) : filteredTickets.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center px-8">
+                <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                  <FileText className="w-12 h-12 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('ticket_no_records')}</h3>
+                <p className="text-sm text-gray-500">
+                  {searchQuery ? t('ticket_no_match') : t('ticket_no_records_desc')}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredTickets.map((ticket, index) => {
+                  const statusInfo = getStatusInfo(ticket.status);
+                  const priorityInfo = getPriorityInfo(ticket.priority);
+                  const StatusIcon = statusInfo.icon;
+
+                  const handleCardClick = (e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    if (onTicketClick) {
+                      onTicketClick(ticket);
+                    }
+                  };
+
+                  const handleFeedbackClick = (e: React.MouseEvent, type: 'like' | 'dislike') => {
+                    e.stopPropagation();
+                    setTicketFeedbacks(prev => ({
+                      ...prev,
+                      [ticket.id]: prev[ticket.id] === type ? null : type
+                    }));
+                  };
+
+                  const currentFeedback = ticketFeedbacks[ticket.id] || null;
+
+                  return (
+                    <motion.div
+                      key={ticket.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className={`w-full rounded-xl p-4 transition-all border-l-4 ${statusInfo.borderColor}`}
+                      style={{
+                        backdropFilter: 'blur(8px)',
+                        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                      }}
+                    >
+                      <button
+                        onClick={handleCardClick}
+                        className="w-full text-left haptic-feedback"
+                      >
+                        {/* 头部 */}
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-semibold text-gray-900 text-sm">{ticket.title}</h3>
+                              {ticket.hasImage && (
+                                <Camera className="w-4 h-4 text-gray-400" />
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <span className="font-mono">{ticket.id}</span>
+                              <span>•</span>
+                              <span>{ticket.type === 'report' ? t('ticket_type_report') : t('ticket_type_question')}</span>
+                            </div>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0 ml-2" />
+                        </div>
+
+                        {/* 描述 */}
+                        <p className="text-xs text-gray-600 mb-3 line-clamp-2">
+                          {ticket.description}
+                        </p>
+
+                        {/* 状态和优先级 */}
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className={`flex items-center gap-1 px-2 py-1 rounded-lg ${statusInfo.color}`}>
+                            <StatusIcon className="w-3 h-3" />
+                            <span className="text-xs font-medium">{statusInfo.label}</span>
+                          </div>
+                          <div className={`px-2 py-1 rounded-lg ${priorityInfo.color}`}>
+                            <span className="text-xs font-medium">{t('ticket_priority_label')}: {priorityInfo.label}</span>
+                          </div>
+                        </div>
+
+                        {/* 时间和工程师信息 */}
+                        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                          <div className="flex items-center gap-4 text-xs text-gray-500">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              <span>{ticket.createdAt.toLocaleDateString(language === 'en' ? 'en-US' : 'zh-CN')}</span>
+                            </div>
+                            {ticket.assignedTo && (
+                              <div className="flex items-center gap-1">
+                                <UserIcon className="w-3 h-3" />
+                                <span>{ticket.assignedTo}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 处理中的工单显示预计时间 */}
+                          {ticket.status === 'processing' && ticket.estimatedTime && (
+                            <div className="flex items-center gap-1 text-xs text-blue-600 font-medium">
+                              <Clock className="w-3 h-3" />
+                              <span>{ticket.estimatedTime}</span>
+                            </div>
+                          )}
+
+                          {/* 已完成的工单显示完成时间 */}
+                          {ticket.status === 'completed' && (
+                            <div className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                              <CheckCircle className="w-3 h-3" />
+                              <span>{ticket.updatedAt.toLocaleDateString(language === 'en' ? 'en-US' : 'zh-CN')}</span>
+                            </div>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                          <span className="font-mono">{ticket.id}</span>
-                          <span>•</span>
-                          <span>{ticket.type === 'report' ? '故障报修' : '问题咨询'}</span>
-                        </div>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0 ml-2" />
-                    </div>
 
-                    {/* 描述 */}
-                    <p className="text-xs text-gray-600 mb-3 line-clamp-2">
-                      {ticket.description}
-                    </p>
+                      </button>
 
-                    {/* 状态和优先级 */}
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className={`flex items-center gap-1 px-2 py-1 rounded-lg ${statusInfo.color}`}>
-                        <StatusIcon className="w-3 h-3" />
-                        <span className="text-xs font-medium">{statusInfo.label}</span>
-                      </div>
-                      <div className={`px-2 py-1 rounded-lg ${priorityInfo.color}`}>
-                        <span className="text-xs font-medium">优先级: {priorityInfo.label}</span>
-                      </div>
-                    </div>
-
-                    {/* 时间和工程师信息 */}
-                    <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                      <div className="flex items-center gap-4 text-xs text-gray-500">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          <span>{ticket.createdAt.toLocaleDateString('zh-CN')}</span>
-                        </div>
-                        {ticket.assignedTo && (
-                          <div className="flex items-center gap-1">
-                            <UserIcon className="w-3 h-3" />
-                            <span>{ticket.assignedTo}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* 处理中的工单显示预计时间 */}
-                      {ticket.status === 'processing' && ticket.estimatedTime && (
-                        <div className="flex items-center gap-1 text-xs text-blue-600 font-medium">
-                          <Clock className="w-3 h-3" />
-                          <span>{ticket.estimatedTime}</span>
+                      {/* 评价按钮 - 已完成和已取消的工单显示 */}
+                      {(ticket.status === 'completed' || ticket.status === 'cancelled') && (
+                        <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                          <button
+                            onClick={(e) => handleFeedbackClick(e, 'like')}
+                            className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs transition-colors haptic-feedback ${currentFeedback === 'like'
+                              ? 'bg-green-500 text-white'
+                              : 'bg-green-50 text-green-600 hover:bg-green-100'
+                              }`}
+                          >
+                            <ThumbsUp className={`w-3 h-3 ${currentFeedback === 'like' ? 'fill-current' : ''}`} />
+                            <span>{t('ticket_satisfied')}</span>
+                          </button>
+                          <button
+                            onClick={(e) => handleFeedbackClick(e, 'dislike')}
+                            className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs transition-colors haptic-feedback ${currentFeedback === 'dislike'
+                              ? 'bg-red-500 text-white'
+                              : 'bg-red-50 text-red-600 hover:bg-red-100'
+                              }`}
+                          >
+                            <ThumbsDown className={`w-3 h-3 ${currentFeedback === 'dislike' ? 'fill-current' : ''}`} />
+                            <span>{t('ticket_unsatisfied')}</span>
+                          </button>
                         </div>
                       )}
 
-                      {/* 已完成的工单显示完成时间 */}
-                      {ticket.status === 'completed' && (
-                        <div className="flex items-center gap-1 text-xs text-green-600 font-medium">
-                          <CheckCircle className="w-3 h-3" />
-                          <span>{ticket.updatedAt.toLocaleDateString('zh-CN')}</span>
+                      {/* 处理中的工单显示快捷操作 */}
+                      {ticket.status === 'processing' && (
+                        <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onTicketClick) onTicketClick(ticket);
+                            }}
+                            className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs hover:bg-blue-100 transition-colors haptic-feedback"
+                          >
+                            <MessageSquare className="w-3 h-3" />
+                            <span>{t('ticket_send_message')}</span>
+                          </button>
+                          <button className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-green-50 text-green-600 rounded-lg text-xs hover:bg-green-100 transition-colors haptic-feedback">
+                            <Phone className="w-3 h-3" />
+                            <span>{t('ticket_call_engineer')}</span>
+                          </button>
                         </div>
                       )}
-                    </div>
-
-                  </button>
-
-                  {/* 评价按钮 - 已完成和已取消的工单显示 */}
-                  {(ticket.status === 'completed' || ticket.status === 'cancelled') && (
-                    <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
-                      <button
-                        onClick={(e) => handleFeedbackClick(e, 'like')}
-                        className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs transition-colors haptic-feedback ${currentFeedback === 'like'
-                          ? 'bg-green-500 text-white'
-                          : 'bg-green-50 text-green-600 hover:bg-green-100'
-                          }`}
-                      >
-                        <ThumbsUp className={`w-3 h-3 ${currentFeedback === 'like' ? 'fill-current' : ''}`} />
-                        <span>满意</span>
-                      </button>
-                      <button
-                        onClick={(e) => handleFeedbackClick(e, 'dislike')}
-                        className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs transition-colors haptic-feedback ${currentFeedback === 'dislike'
-                          ? 'bg-red-500 text-white'
-                          : 'bg-red-50 text-red-600 hover:bg-red-100'
-                          }`}
-                      >
-                        <ThumbsDown className={`w-3 h-3 ${currentFeedback === 'dislike' ? 'fill-current' : ''}`} />
-                        <span>不满意</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {/* 处理中的工单显示快捷操作 */}
-                  {ticket.status === 'processing' && (
-                    <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onTicketClick) onTicketClick(ticket);
-                        }}
-                        className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs hover:bg-blue-100 transition-colors haptic-feedback"
-                      >
-                        <MessageSquare className="w-3 h-3" />
-                        <span>发送消息</span>
-                      </button>
-                      <button className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-green-50 text-green-600 rounded-lg text-xs hover:bg-green-100 transition-colors haptic-feedback">
-                        <Phone className="w-3 h-3" />
-                        <span>致电工程师</span>
-                      </button>
-                    </div>
-                  )}
-                </motion.div>
-              );
-            })}
-            </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
             )}
           </div>
 
-      {/* 底部提示
+          {/* 底部提示
       <div 
         className="px-4 py-3 safe-area-bottom"
         style={{
@@ -664,79 +664,79 @@ export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat, isLogge
           {/* 创建工单提示对话框 */}
           <AnimatePresence>
             {showCreatePrompt && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-end justify-center z-50"
-            onClick={() => setShowCreatePrompt(false)}
-          >
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25 }}
-              className="bg-white w-full max-w-md rounded-t-3xl overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">创建工单</h3>
-                <button
-                  onClick={() => setShowCreatePrompt(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/50 flex items-end justify-center z-50"
+                onClick={() => setShowCreatePrompt(false)}
+              >
+                <motion.div
+                  initial={{ y: '100%' }}
+                  animate={{ y: 0 }}
+                  exit={{ y: '100%' }}
+                  transition={{ type: 'spring', damping: 25 }}
+                  className="bg-white w-full max-w-md rounded-t-3xl overflow-hidden"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <X className="w-5 h-5 text-gray-500" />
-                </button>
-              </div>
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                    <h3 className="text-lg font-semibold text-gray-900">{t('ticket_create_title')}</h3>
+                    <button
+                      onClick={() => setShowCreatePrompt(false)}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                      <X className="w-5 h-5 text-gray-500" />
+                    </button>
+                  </div>
 
-              <div className="px-6 py-6">
-                <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-4 mb-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Bot className="w-6 h-6 text-white" />
+                  <div className="px-6 py-6">
+                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-4 mb-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <Bot className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-900 mb-2">{t('ticket_consult_ai_first_title')}</h4>
+                          <p className="text-sm text-gray-600 mb-3">
+                            {t('ticket_consult_ai_first_desc')}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900 mb-2">建议先咨询AI助手</h4>
-                      <p className="text-sm text-gray-600 mb-3">
-                        我们的AI助手可以快速帮您解决大部分常见问题。如果AI无法解决，再创建工单也不迟。
-                      </p>
+
+                    <div className="space-y-3">
+                      <button
+                        onClick={handleGoToChat}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors haptic-feedback"
+                      >
+                        <MessageSquare className="w-5 h-5" />
+                        <span>{t('ticket_go_ai')}</span>
+                      </button>
+                      <button
+                        onClick={handleContinueCreate}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors haptic-feedback"
+                      >
+                        <Plus className="w-5 h-5" />
+                        <span>{t('ticket_continue_create')}</span>
+                      </button>
                     </div>
                   </div>
-                </div>
-
-                <div className="space-y-3">
-                  <button
-                    onClick={handleGoToChat}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors haptic-feedback"
-                  >
-                    <MessageSquare className="w-5 h-5" />
-                    <span>去咨询AI助手</span>
-                  </button>
-                  <button
-                    onClick={handleContinueCreate}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors haptic-feedback"
-                  >
-                    <Plus className="w-5 h-5" />
-                    <span>继续创建工单</span>
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
+                </motion.div>
+              </motion.div>
             )}
           </AnimatePresence>
 
           {/* 创建工单表单 - 使用统一的 TicketForm 组件 */}
           <AnimatePresence>
             {showTicketForm && (
-          <TicketForm
-            formData={ticketFormData}
-            onFormDataChange={setTicketFormData}
-            onSubmit={handleSubmitTicket}
-            onCancel={() => setShowTicketForm(false)}
-            submitting={submitting}
-            error={error}
-            />
+              <TicketForm
+                formData={ticketFormData}
+                onFormDataChange={setTicketFormData}
+                onSubmit={handleSubmitTicket}
+                onCancel={() => setShowTicketForm(false)}
+                submitting={submitting}
+                error={error}
+              />
             )}
           </AnimatePresence>
         </>

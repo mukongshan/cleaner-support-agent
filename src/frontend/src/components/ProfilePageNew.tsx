@@ -155,7 +155,7 @@ export function ProfilePage({ userRole, onRoleChange, onLogout, isLoggedIn, onSh
   };
 
   const getRoleLabel = (role: UserRole) => {
-    return role === 'dealer' ? '经销商' : '终端用户';
+    return role === 'dealer' ? t('dealer') : t('enduser');
   };
 
   const handleLogout = () => {
@@ -284,10 +284,10 @@ export function ProfilePage({ userRole, onRoleChange, onLogout, isLoggedIn, onSh
               </div>
               <div className={`text-sm font-medium ${userRole === 'dealer' ? 'text-purple-600' : 'text-gray-700'
                 }`}>
-                经销商
+                {t('dealer')}
               </div>
               <div className="text-xs text-gray-500 mt-1">
-                批发/代理商
+                {t('role_distributor_desc')}
               </div>
             </button>
           </div>
@@ -299,7 +299,7 @@ export function ProfilePage({ userRole, onRoleChange, onLogout, isLoggedIn, onSh
                 }`} />
               <span className={`text-xs ${userRole === 'dealer' ? 'text-purple-700' : 'text-blue-700'
                 }`}>
-                当前身份：{getRoleLabel(userRole)}
+                {t('role_current_identity')}：{getRoleLabel(userRole)}
               </span>
             </div>
           </div>

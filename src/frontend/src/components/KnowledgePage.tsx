@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Search,
   Book,
@@ -18,8 +18,10 @@ import { motion } from 'motion/react';
 import { getMediaFiles, getFileAccessInfo, previewFile, downloadFile, MediaFile, FileAccessInfo } from '../services/api/media';
 import { Dialog, DialogContent } from './ui/dialog';
 import { Button } from './ui/button';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export function KnowledgePage() {
+  const { t } = useLanguage();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
@@ -34,14 +36,14 @@ export function KnowledgePage() {
   const isInitialMount = useRef(true);
 
   // 分类配置（前端分类 -> 后端分类映射）
-  const categories = useRef([
-    { id: 'all', name: '全部', icon: Book, color: 'blue', backendCategory: undefined },
-    { id: 'sales', name: '销售资料', icon: Book, color: 'blue', backendCategory: 'sales' },
-    { id: 'maintenance', name: '维护保养', icon: Wrench, color: 'green', backendCategory: 'maintenance' },
-    { id: 'product', name: '产品资料', icon: Video, color: 'purple', backendCategory: 'product' },
-    { id: 'company', name: '公司介绍', icon: Book, color: 'orange', backendCategory: 'company' },
-    { id: 'training', name: '培训资料', icon: Video, color: 'purple', backendCategory: 'training' }
-  ]).current;
+  const categories = useMemo(() => ([
+    { id: 'all', name: t('knowledge_category_all'), icon: Book, color: 'blue', backendCategory: undefined },
+    { id: 'sales', name: t('knowledge_category_sales'), icon: Book, color: 'blue', backendCategory: 'sales' },
+    { id: 'maintenance', name: t('knowledge_category_maintenance'), icon: Wrench, color: 'green', backendCategory: 'maintenance' },
+    { id: 'product', name: t('knowledge_category_product'), icon: Video, color: 'purple', backendCategory: 'product' },
+    { id: 'company', name: t('knowledge_category_company'), icon: Book, color: 'orange', backendCategory: 'company' },
+    { id: 'training', name: t('knowledge_category_training'), icon: Video, color: 'purple', backendCategory: 'training' }
+  ]), [t]);
 
   // 搜索防抖处理（初始加载时不防抖）
   useEffect(() => {
@@ -101,7 +103,7 @@ export function KnowledgePage() {
         setLoading(false);
       }, 0);
     } catch (err: any) {
-      const errorMessage = err.message || '加载文件列表失败';
+      const errorMessage = err.message || t('knowledge_load_failed');
       console.error('[KnowledgePage] 加载文件列表失败:', {
         error: err,
         message: errorMessage,
@@ -146,7 +148,7 @@ export function KnowledgePage() {
     });
 
     const fileId = file.id;
-    
+
     try {
       // 先获取文件访问信息，判断是否可预览
       console.log('[KnowledgePage] 开始获取文件访问信息', { fileId });
@@ -169,7 +171,7 @@ export function KnowledgePage() {
         message: err.message,
         fileId: file.id
       });
-      alert(err?.message || '打开文件失败，请稍后重试');
+      alert(err?.message || t('knowledge_open_failed'));
     }
   };
 
@@ -210,7 +212,7 @@ export function KnowledgePage() {
       await previewFile(fileId);
     } catch (error: any) {
       console.error('[KnowledgePage] 预览失败:', error);
-      alert(error?.message || '预览失败，请稍后重试');
+      alert(error?.message || t('knowledge_preview_failed'));
     }
   };
 
@@ -220,7 +222,7 @@ export function KnowledgePage() {
       await downloadFile(fileId);
     } catch (error: any) {
       console.error('[KnowledgePage] 下载失败:', error);
-      alert(error?.message || '下载失败，请稍后重试');
+      alert(error?.message || t('knowledge_download_failed'));
     }
   };
 
@@ -254,19 +256,19 @@ export function KnowledgePage() {
   const getTypeName = (type: string) => {
     switch (type?.toUpperCase()) {
       case 'VIDEO':
-        return '视频';
+        return t('file_type_video');
       case 'PDF':
-        return 'PDF';
+        return t('file_type_pdf');
       case 'IMAGE':
-        return '图片';
+        return t('file_type_image');
       case 'EXCEL':
-        return 'Excel';
+        return t('file_type_excel');
       case 'PPT':
-        return 'PPT';
+        return t('file_type_ppt');
       case 'ARTICLE':
-        return '文章';
+        return t('file_type_article');
       default:
-        return '文档';
+        return t('file_type_doc');
     }
   };
 
@@ -280,14 +282,14 @@ export function KnowledgePage() {
           backgroundColor: 'rgba(255, 255, 255, 0.1)'
         }}
       >
-        <h2 className="text-lg font-semibold text-gray-900 mb-3">知识库中心</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">{t('knowledge_center_title')}</h2>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="搜索教程、视频、文档..."
+            placeholder={t('knowledge_search_placeholder')}
             className="w-full pl-10 pr-4 py-2.5 bg-gray-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
           />
         </div>
@@ -327,17 +329,17 @@ export function KnowledgePage() {
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-8">
             <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
-            <p className="text-sm text-gray-500">加载中...</p>
+            <p className="text-sm text-gray-500">{t('loading')}</p>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-8">
             <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mb-4">
               <X className="w-12 h-12 text-red-500" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">加载失败</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('error')}</h3>
             <p className="text-sm text-gray-500 mb-4">{error}</p>
             <Button onClick={loadFiles} variant="outline" size="sm">
-              重试
+              {t('retry')}
             </Button>
           </div>
         ) : files.length === 0 ? (
@@ -345,9 +347,9 @@ export function KnowledgePage() {
             <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
               <Search className="w-12 h-12 text-gray-400" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">未找到相关内容</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('knowledge_not_found_title')}</h3>
             <p className="text-sm text-gray-500">
-              试试其他关键词或浏览不同分类
+              {t('knowledge_not_found_desc')}
             </p>
           </div>
         ) : (
@@ -424,7 +426,7 @@ export function KnowledgePage() {
                   {/* 显示文件ID */}
                   {selectedFile.id && (
                     <div className="text-xs text-gray-500">
-                      文件ID: {selectedFile.id}
+                      {t('knowledge_file_id')}: {selectedFile.id}
                     </div>
                   )}
                   <div className="flex gap-2">
@@ -441,7 +443,7 @@ export function KnowledgePage() {
                         variant="default"
                       >
                         <Eye className="w-4 h-4 mr-2" />
-                        预览
+                        {t('view')}
                       </Button>
                     )}
                     <Button
@@ -456,13 +458,13 @@ export function KnowledgePage() {
                       variant="outline"
                     >
                       <Download className="w-4 h-4 mr-2" />
-                      下载
+                      {t('download')}
                     </Button>
                   </div>
                 </div>
               ) : (
                 <div className="text-center py-4 text-sm text-gray-500">
-                  无法获取文件访问信息
+                  {t('knowledge_access_info_unavailable')}
                 </div>
               )}
             </div>

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { login } from '../services/api';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface LoginPageProps {
     onLoginSuccess: () => void;
@@ -15,6 +16,7 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ onLoginSuccess, onClose, onSwitchToRegister }: LoginPageProps) {
+    const { t } = useLanguage();
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -24,22 +26,22 @@ export function LoginPage({ onLoginSuccess, onClose, onSwitchToRegister }: Login
     const handleLogin = async () => {
         // 表单验证
         if (!phone.trim()) {
-            setError('请输入手机号');
+            setError(t('validation_phone_required'));
             return;
         }
 
         if (!/^1[3-9]\d{9}$/.test(phone)) {
-            setError('请输入正确的手机号');
+            setError(t('validation_phone_invalid'));
             return;
         }
 
         if (!password.trim()) {
-            setError('请输入密码');
+            setError(t('validation_password_required'));
             return;
         }
 
         if (password.length < 6) {
-            setError('密码长度不能少于6位');
+            setError(t('validation_password_min6'));
             return;
         }
 
@@ -57,7 +59,7 @@ export function LoginPage({ onLoginSuccess, onClose, onSwitchToRegister }: Login
             // 登录成功
             onLoginSuccess();
         } catch (err: any) {
-            setError(err.message || '登录失败，请检查手机号和密码');
+            setError(err.message || t('login_failed_default'));
         } finally {
             setLoading(false);
         }
@@ -82,7 +84,7 @@ export function LoginPage({ onLoginSuccess, onClose, onSwitchToRegister }: Login
                             <ArrowLeft className="w-5 h-5 text-gray-700" />
                         </button>
                     )}
-                    <h2 className="text-lg font-semibold text-gray-900">登录</h2>
+                    <h2 className="text-lg font-semibold text-gray-900">{t('login')}</h2>
                 </div>
 
                 {/* 表单内容 */}
@@ -102,7 +104,7 @@ export function LoginPage({ onLoginSuccess, onClose, onSwitchToRegister }: Login
                         {/* 手机号输入 */}
                         <div className="mb-4">
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                请输入手机号
+                                {t('login_phone_label')}
                             </label>
                             <input
                                 type="tel"
@@ -112,7 +114,7 @@ export function LoginPage({ onLoginSuccess, onClose, onSwitchToRegister }: Login
                                     setError('');
                                 }}
                                 onKeyPress={handleKeyPress}
-                                placeholder="手机号"
+                                placeholder={t('login_phone_placeholder')}
                                 maxLength={11}
                                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
                             />
@@ -121,7 +123,7 @@ export function LoginPage({ onLoginSuccess, onClose, onSwitchToRegister }: Login
                         {/* 密码输入 */}
                         <div className="mb-6">
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                请输入密码
+                                {t('login_password_label')}
                             </label>
                             <div className="relative">
                                 <input
@@ -132,7 +134,7 @@ export function LoginPage({ onLoginSuccess, onClose, onSwitchToRegister }: Login
                                         setError('');
                                     }}
                                     onKeyPress={handleKeyPress}
-                                    placeholder="密码"
+                                    placeholder={t('login_password_placeholder')}
                                     className="w-full px-4 pr-12 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
                                 />
                                 <button
@@ -155,7 +157,7 @@ export function LoginPage({ onLoginSuccess, onClose, onSwitchToRegister }: Login
                                 onClick={onSwitchToRegister}
                                 className="text-sm text-blue-600 hover:text-blue-700 transition-colors"
                             >
-                                还没有账号？去注册
+                                {t('login_no_account_register')}
                             </button>
                         </div>
 
@@ -168,10 +170,10 @@ export function LoginPage({ onLoginSuccess, onClose, onSwitchToRegister }: Login
                             {loading ? (
                                 <>
                                     <Loader className="w-5 h-5 animate-spin" />
-                                    <span>登录中...</span>
+                                    <span>{t('logging_in')}</span>
                                 </>
                             ) : (
-                                <span>登录</span>
+                                <span>{t('login')}</span>
                             )}
                         </button>
                     </div>

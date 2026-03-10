@@ -11,8 +11,8 @@ export function LanguageSelectionPage({ onBack }: LanguageSelectionPageProps) {
   const { language, setLanguage, t } = useLanguage();
 
   const languages = [
-    { code: 'zh' as const, label: '简体中文' },
-    { code: 'en' as const, label: 'English' }
+    { code: 'zh' as const, label: t('chinese') },
+    { code: 'en' as const, label: t('english') }
   ];
 
   const handleLanguageSelect = (langCode: 'zh' | 'en') => {
@@ -36,7 +36,7 @@ export function LanguageSelectionPage({ onBack }: LanguageSelectionPageProps) {
         justifyContent: 'center'
       }}
     >
-      <div 
+      <div
         style={{
           width: '100%',
           maxWidth: '28rem',
@@ -47,7 +47,7 @@ export function LanguageSelectionPage({ onBack }: LanguageSelectionPageProps) {
         }}
       >
         {/* Header */}
-        <div 
+        <div
           className="px-4 py-3 flex items-center gap-3 relative z-10"
           style={{
             backdropFilter: 'blur(12px)',
@@ -65,7 +65,7 @@ export function LanguageSelectionPage({ onBack }: LanguageSelectionPageProps) {
 
         {/* Language List */}
         <div className="flex-1 overflow-y-auto px-4 py-4">
-          <div 
+          <div
             className="rounded-2xl overflow-hidden"
             style={{
               backdropFilter: 'blur(8px)',

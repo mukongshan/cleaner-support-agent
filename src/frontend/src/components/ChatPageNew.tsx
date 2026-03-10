@@ -185,6 +185,7 @@ function ThinkingBlock({
   /** 是否是当前正在流式输出的消息 — 只有当 isStreaming=true 时才显示"思考中"动画 */
   isStreaming?: boolean;
 }) {
+  const { t } = useLanguage();
   // 真正"思考中"：内容未完成 且 该消息是当前流
   const isActivelyThinking = !isComplete && isStreaming;
 
@@ -206,7 +207,7 @@ function ThinkingBlock({
         className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-500 transition-colors select-none"
       >
         <Brain className="w-3 h-3" />
-        <span>{isActivelyThinking ? '思考中…' : '查看思考过程'}</span>
+        <span>{isActivelyThinking ? t('thinking_active') : t('thinking_view_process')}</span>
         {isActivelyThinking && <Loader2 className="w-3 h-3 animate-spin" />}
         <ChevronDown
           className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? '' : '-rotate-90'}`}
@@ -461,48 +462,88 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
     t('ai_thinking_3')
   ];
 
-  const suggestedQuestions = [
-    '如何清理主刷？',
-    '更换边刷教程',
-    '机器人不回充怎么办？',
-    '如何清洁传感器？'
-  ];
+  const suggestedQuestions = language === 'zh'
+    ? [
+      '如何清理主刷？',
+      '更换边刷教程',
+      '机器人不回充怎么办？',
+      '如何清洁传感器？'
+    ]
+    : [
+      'How do I clean the main brush?',
+      'How to replace the side brush?',
+      'What should I do if the robot cannot return to charge?',
+      'How do I clean the sensors?'
+    ];
 
   // 根据AI回复内容生成相关的问题建议
   const getFollowUpQuestions = (aiContent: string): string[] => {
     const content = aiContent.toLowerCase();
-    const followUpMap: { [key: string]: string[][] } = {
-      '主刷': [
-        ['主刷如何拆卸？', '主刷多久更换一次？', '主刷不转怎么办？'],
-        ['主刷卡住了怎么处理？', '主刷清洁步骤', '主刷安装方法'],
-        ['主刷型号选择', '主刷购买渠道', '主刷使用注意事项']
-      ],
-      '边刷': [
-        ['边刷如何更换？', '边刷磨损严重怎么办？', '边刷不转的原因？'],
-        ['边刷安装教程', '边刷清洁方法', '边刷使用寿命'],
-        ['边刷型号匹配', '边刷购买推荐', '边刷故障排查']
-      ],
-      '传感器': [
-        ['传感器如何清洁？', '传感器故障怎么办？', '传感器位置在哪里？'],
-        ['传感器维护方法', '传感器校准步骤', '传感器常见问题'],
-        ['传感器更换指南', '传感器购买建议', '传感器故障代码']
-      ],
-      '充电': [
-        ['充电座无法识别？', '充电时间需要多久？', '充电指示灯不亮？'],
-        ['充电故障排查', '充电座清洁方法', '充电异常处理'],
-        ['充电座安装位置', '充电座购买推荐', '充电注意事项']
-      ],
-      '故障': [
-        ['还有哪些常见故障？', '如何预防故障？', '故障代码如何查询？'],
-        ['故障诊断方法', '故障处理流程', '故障报修步骤'],
-        ['故障预防措施', '故障维修建议', '故障联系客服']
-      ],
-      '维护': [
-        ['日常维护需要做什么？', '多久维护一次？', '维护工具哪里买？'],
-        ['维护保养清单', '维护时间安排', '维护注意事项'],
-        ['维护工具推荐', '维护视频教程', '维护常见问题']
-      ]
-    };
+    const followUpMap: { [key: string]: string[][] } = language === 'zh'
+      ? {
+        '主刷': [
+          ['主刷如何拆卸？', '主刷多久更换一次？', '主刷不转怎么办？'],
+          ['主刷卡住了怎么处理？', '主刷清洁步骤', '主刷安装方法'],
+          ['主刷型号选择', '主刷购买渠道', '主刷使用注意事项']
+        ],
+        '边刷': [
+          ['边刷如何更换？', '边刷磨损严重怎么办？', '边刷不转的原因？'],
+          ['边刷安装教程', '边刷清洁方法', '边刷使用寿命'],
+          ['边刷型号匹配', '边刷购买推荐', '边刷故障排查']
+        ],
+        '传感器': [
+          ['传感器如何清洁？', '传感器故障怎么办？', '传感器位置在哪里？'],
+          ['传感器维护方法', '传感器校准步骤', '传感器常见问题'],
+          ['传感器更换指南', '传感器购买建议', '传感器故障代码']
+        ],
+        '充电': [
+          ['充电座无法识别？', '充电时间需要多久？', '充电指示灯不亮？'],
+          ['充电故障排查', '充电座清洁方法', '充电异常处理'],
+          ['充电座安装位置', '充电座购买推荐', '充电注意事项']
+        ],
+        '故障': [
+          ['还有哪些常见故障？', '如何预防故障？', '故障代码如何查询？'],
+          ['故障诊断方法', '故障处理流程', '故障报修步骤'],
+          ['故障预防措施', '故障维修建议', '故障联系客服']
+        ],
+        '维护': [
+          ['日常维护需要做什么？', '多久维护一次？', '维护工具哪里买？'],
+          ['维护保养清单', '维护时间安排', '维护注意事项'],
+          ['维护工具推荐', '维护视频教程', '维护常见问题']
+        ]
+      }
+      : {
+        'main brush': [
+          ['How do I remove the main brush?', 'How often should I replace the main brush?', 'What if the main brush is not rotating?'],
+          ['How to fix a stuck main brush?', 'Main brush cleaning steps', 'How to install the main brush'],
+          ['How to choose main brush model?', 'Where to buy the main brush?', 'Main brush usage tips']
+        ],
+        'side brush': [
+          ['How do I replace the side brush?', 'What if the side brush is heavily worn?', 'Why is the side brush not rotating?'],
+          ['Side brush installation guide', 'How to clean the side brush', 'Side brush lifespan'],
+          ['Side brush compatibility', 'Recommended side brush purchase', 'Side brush troubleshooting']
+        ],
+        'sensor': [
+          ['How do I clean the sensors?', 'What if a sensor fails?', 'Where are the sensors located?'],
+          ['Sensor maintenance methods', 'Sensor calibration steps', 'Common sensor issues'],
+          ['Sensor replacement guide', 'Sensor purchase suggestions', 'Sensor error codes']
+        ],
+        'charging': [
+          ['Why cannot the dock be detected?', 'How long does charging take?', 'What if the charging indicator is off?'],
+          ['Charging troubleshooting', 'How to clean the charging dock', 'How to handle charging issues'],
+          ['Best dock placement', 'Recommended dock purchase', 'Charging precautions']
+        ],
+        'fault': [
+          ['What other common faults are there?', 'How can I prevent faults?', 'How to check error codes?'],
+          ['Fault diagnosis methods', 'Fault handling process', 'Repair request steps'],
+          ['Fault prevention measures', 'Repair suggestions', 'Contact support for faults']
+        ],
+        'maintenance': [
+          ['What routine maintenance is needed?', 'How often should I maintain it?', 'Where can I buy maintenance tools?'],
+          ['Maintenance checklist', 'Maintenance schedule', 'Maintenance precautions'],
+          ['Recommended maintenance tools', 'Maintenance video tutorials', 'Common maintenance questions']
+        ]
+      };
 
     // 根据内容匹配相关建议
     for (const [key, questionGroups] of Object.entries(followUpMap)) {
@@ -513,11 +554,17 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
     }
 
     // 默认建议（多组）
-    const defaultGroups = [
-      ['还有其他问题吗？', '需要更详细的说明吗？', '还有其他故障吗？'],
-      ['问题解决了吗？', '需要进一步帮助？', '还有其他疑问？'],
-      ['操作步骤清楚吗？', '需要视频教程？', '还有其他问题？']
-    ];
+    const defaultGroups = language === 'zh'
+      ? [
+        ['还有其他问题吗？', '需要更详细的说明吗？', '还有其他故障吗？'],
+        ['问题解决了吗？', '需要进一步帮助？', '还有其他疑问？'],
+        ['操作步骤清楚吗？', '需要视频教程？', '还有其他问题？']
+      ]
+      : [
+        ['Any other questions?', 'Need a more detailed explanation?', 'Any other issues?'],
+        ['Is your problem solved?', 'Need further help?', 'Any other concerns?'],
+        ['Are the steps clear?', 'Need a video tutorial?', 'Anything else I can help with?']
+      ];
     return defaultGroups[Math.floor(Math.random() * defaultGroups.length)];
   };
 
@@ -944,7 +991,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
         fileType: file.type,
         allowedTypes
       });
-      alert('仅支持 JPG、PNG、WEBP 格式的图片');
+      alert(t('image_invalid_format'));
       return;
     }
 
@@ -955,7 +1002,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
         fileSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
         maxSize: `${(maxSize / 1024 / 1024).toFixed(2)}MB`
       });
-      alert('图片大小不能超过 10MB');
+      alert(t('image_too_large_10mb'));
       return;
     }
 
@@ -1129,13 +1176,13 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
     const hasFailedImages = uploadedImages.some(img => img.status === 'failed');
 
     if (hasProcessingImages) {
-      return '图片正在识别中，请稍候...';
+      return t('send_tip_image_recognizing');
     }
     if (hasFailedImages) {
-      return '存在识别失败的图片，请重试或删除';
+      return t('send_tip_image_failed');
     }
     if (!hasText && !hasCompletedImages) {
-      return '请输入消息或上传图片';
+      return t('send_tip_input_or_image');
     }
     return '';
   };
@@ -1401,7 +1448,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
                 return [...prev, {
                   id: aiMessageId,
                   type: 'ai' as const,
-                  content: fullAnswer || '抱歉，没有收到回复。请稍后重试。',
+                  content: fullAnswer || t('ai_no_reply_retry'),
                   timestamp: new Date(),
                   rating: null
                 }];
@@ -1409,7 +1456,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
                 console.warn('[ChatPage] [发送消息] 未收到 AI 回答（图片对话）');
                 return prev.map(msg =>
                   msg.id === aiMessageId
-                    ? { ...msg, content: '抱歉，没有收到回复。请稍后重试。' }
+                    ? { ...msg, content: t('ai_no_reply_retry') }
                     : msg
                 );
               } else {
@@ -1465,7 +1512,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
           routeMessages(prev =>
             prev.map(msg =>
               msg.id === aiMessageId
-                ? { ...msg, content: '抱歉，处理图片时出现了错误。请稍后重试。' }
+                ? { ...msg, content: t('ai_image_process_error') }
                 : msg
             )
           );
@@ -1651,7 +1698,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
             routeMessages(prev => [...prev, {
               id: aiMessageId,
               type: 'ai' as const,
-              content: '抱歉，我没有收到回复。请重试。',
+              content: t('ai_no_reply_simple'),
               timestamp: new Date(),
               rating: null
             }]);
@@ -1665,8 +1712,8 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
                 ? {
                   ...msg,
                   citation: {
-                    title: resource.title || '知识库文档',
-                    page: resource.page || '参考资料'
+                    title: resource.title || t('knowledge_doc_default'),
+                    page: resource.page || t('reference_default')
                   }
                 }
                 : msg
@@ -1688,13 +1735,13 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
         routeThinking(false);
         routeCleanup();
 
-        const errorMessage = error.message || '未知错误';
+        const errorMessage = error.message || t('error');
         console.error('错误详情:', errorMessage);
 
         routeMessages(prev => [...prev, {
           id: aiMessageId,
           type: 'ai' as const,
-          content: `抱歉，我遇到了问题：${errorMessage}\n\n请检查网络连接或稍后再试。`,
+          content: `${t('ai_error_prefix')}${errorMessage}\n\n${t('ai_error_network_hint')}`,
           timestamp: new Date(),
           rating: null
         }]);
@@ -1735,7 +1782,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
       const lastAiIdx = [...prev].map((m, i) => (m.type === 'ai' ? i : -1)).filter(i => i !== -1).pop();
       if (lastAiIdx === undefined) return prev;
       return prev.map((m, i) =>
-        i === lastAiIdx ? { ...m, content: m.content + '\n\n*[已停止生成]*' } : m
+        i === lastAiIdx ? { ...m, content: `${m.content}\n\n*[${t('ai_stop_suffix')}]*` } : m
       );
     });
 
@@ -2292,7 +2339,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
                           <div className="mb-2">
                             <ImageWithAuth
                               src={message.image}
-                              alt="上传的图片"
+                              alt={t('image_uploaded_alt')}
                               className="max-w-[200px] max-h-[200px] rounded-lg object-cover border-2 border-white/20 shadow-sm"
                               style={{
                                 cursor: 'pointer'
@@ -2339,7 +2386,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
                     {(isStreamingMessage || (thinkingPaused && message.type === 'ai' && index === lastAIMessageIndex)) && (
                       <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400">
                         {thinkingPaused ? (
-                          <span>思考已暂停</span>
+                          <span>{t('thinking_paused')}</span>
                         ) : (
                           <Loader2 className="w-3 h-3 animate-spin text-blue-400" />
                         )}
@@ -2350,7 +2397,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
                       <div className="mt-3 pt-3 border-t border-gray-200">
                         <div className="flex items-center gap-2 text-xs text-gray-500">
                           <FileText className="w-3 h-3" />
-                          <span>来源：{message.citation.title} {message.citation.page}</span>
+                          <span>{t('citation_source')}：{message.citation.title} {message.citation.page}</span>
                         </div>
                       </div>
                     )}

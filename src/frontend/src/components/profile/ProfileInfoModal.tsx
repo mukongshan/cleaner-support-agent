@@ -51,12 +51,12 @@ export function ProfileInfoModal({
   const handleUpdateNickname = async () => {
     // 验证昵称
     if (!editNickname.trim()) {
-      setEditError('昵称不能为空');
+      setEditError(t('profile_nickname_required'));
       return;
     }
 
     if (editNickname.trim().length > 20) {
-      setEditError('昵称长度不能超过20个字符');
+      setEditError(t('profile_nickname_too_long'));
       return;
     }
 
@@ -78,7 +78,7 @@ export function ProfileInfoModal({
       // 关闭编辑页面
       setShowEditNickname(false);
     } catch (error: any) {
-      setEditError(error.message || '更新失败，请稍后重试');
+      setEditError(error.message || t('profile_update_failed'));
       // 如果更新失败，恢复之前的昵称
       onPersonalInfoUpdate({
         ...personalInfo,
@@ -95,13 +95,13 @@ export function ProfileInfoModal({
 
     // 验证文件类型
     if (!file.type.startsWith('image/')) {
-      setEditError('请选择图片文件');
+      setEditError(t('profile_select_image_file'));
       return;
     }
 
     // 验证文件大小（5MB）
     if (file.size > 5 * 1024 * 1024) {
-      setEditError('图片大小不能超过5MB');
+      setEditError(t('profile_image_size_limit'));
       return;
     }
 
@@ -138,7 +138,7 @@ export function ProfileInfoModal({
       }
     } catch (error: any) {
       console.error('上传头像失败:', error);
-      setEditError(error.message || '上传失败，请稍后重试');
+      setEditError(error.message || t('profile_upload_failed'));
       // 如果上传失败，恢复之前的头像
       if (userProfile) {
         onPersonalInfoUpdate({
@@ -253,7 +253,7 @@ export function ProfileInfoModal({
                       <div className="w-12 h-12 rounded-full bg-gray-100 overflow-hidden">
                         <img
                           src={personalInfo.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(personalInfo.nickname)}&background=3b82f6&color=fff&size=128`}
-                          alt="头像"
+                          alt={t('image_avatar_alt')}
                           className="w-full h-full object-cover"
                           onError={(e) => {
                             const target = e.currentTarget;
