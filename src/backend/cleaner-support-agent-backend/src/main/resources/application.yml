@@ -92,14 +92,14 @@ app:
     expiration: ${APP_JWT_EXPIRATION:604800}
 
 # Seafile 配置
+# 注意：环境变量 SEAFILE_* 会覆盖 application-local.yml 中的同项配置。
+# 本地开发时若使用 application-local.yml，请勿设置 SEAFILE_REPO_TOKEN 等环境变量，否则后端会用环境变量里的 token。
 seafile:
-  # 为避免在仓库中泄露存储配置，这里不再提供默认值，请在
-  # - 环境变量 SEAFILE_*
-  # - 或 application-local.yml 中进行配置
-  server-url: ${SEAFILE_SERVER_URL}
-  repo-token: ${SEAFILE_REPO_TOKEN}
-  repo-id: ${SEAFILE_REPO_ID}
-  repo-password: ${SEAFILE_REPO_PASSWORD}
+  server-url: ${SEAFILE_SERVER_URL:}
+  repo-token: ${SEAFILE_REPO_TOKEN:}
+  repo-id: ${SEAFILE_REPO_ID:}
+  repo-password: ${SEAFILE_REPO_PASSWORD:}
+  auth-type: ${SEAFILE_AUTH_TYPE:Bearer}
 
 ---
 spring:

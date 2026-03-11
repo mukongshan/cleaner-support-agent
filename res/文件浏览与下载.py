@@ -8,13 +8,14 @@ from urllib.parse import unquote
 # ==========================
 SERVER_URL = "https://box.nju.edu.cn"  # NJU Box 服务器地址
 
-# 你的资料库级别 Token
-REPO_TOKEN = "8142382146993d9f7fc328074f73b28ab644efea"
+# 你的资料库级别 Token（必须是「资料库 API Token」，在 Seafile 资料库设置里生成；
+# 分享链接的 token 只能网页查看，不能用于 download-link API）
+REPO_TOKEN = "8aa52fa7996dafacdda46a0a5694b3e3efc3d99d"
 
 # 资料库的 UUID
 REPO_ID = "9136e9de-f49e-45f6-9aff-9e3abe07a257"  # 请确认这是你的目标资料库 ID
 
-FILE_PATH = "01-Tool Preparation.mp4"  # ✅ 请修改为你资料库中实际存在的文件路径
+FILE_PATH = "00-Sales Kit/01-Product PreSale Training.pptx"  # ✅ 请修改为你资料库中实际存在的文件路径
 
 DOWNLOAD_FOLDER = "./downloads"  # 文件下载保存的本地目录（可选）
 

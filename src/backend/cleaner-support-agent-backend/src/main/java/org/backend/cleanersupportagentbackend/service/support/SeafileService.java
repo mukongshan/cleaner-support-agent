@@ -31,6 +31,10 @@ public class SeafileService {
     @Value("${seafile.repo-password}")
     private String repoPassword;
 
+    /** Authorization 前缀：Bearer（Seafile 11.0+）或 Token（旧版，如部分 NJU Box） */
+    @Value("${seafile.auth-type:Bearer}")
+    private String authType;
+
     private final RestTemplate restTemplate;
     private boolean enabled = true;
 
@@ -66,7 +70,7 @@ public class SeafileService {
         }
 
         enabled = true;
-        System.out.println("[SeafileService] 配置初始化成功");
+        System.out.println("[SeafileService] 配置初始化成功（若获取下载链接 401，请核对此处 token 与 application-local.yml 一致，并确认未设置环境变量 SEAFILE_REPO_TOKEN）");
     }
 
     /**
@@ -103,7 +107,8 @@ public class SeafileService {
             System.out.println("[DEBUG] 最终请求 URI: " + finalUri);
     
             HttpHeaders headers = new HttpHeaders();
-            headers.set("Authorization", "Bearer " + repoToken);
+            String prefix = (authType != null && authType.trim().equalsIgnoreCase("Token")) ? "Token" : "Bearer";
+            headers.set("Authorization", prefix + " " + repoToken);
             HttpEntity<?> entity = new HttpEntity<>(headers);
     
             ResponseEntity<String> response = restTemplate.exchange(
