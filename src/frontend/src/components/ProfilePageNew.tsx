@@ -25,7 +25,7 @@ import {
   AlignVerticalJustifyStart
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { UserRole } from '../App';
+import type { UserRole } from '../types/app';
 import { clearToken, getUserProfile, updateUserProfile, UserProfile, uploadMedia, API_BASE_URL } from '../services/api';
 import { useLanguage } from '../contexts/LanguageContext';
 import { LanguageSelectionPage } from './LanguageSelectionPage';

@@ -70,6 +70,16 @@ export function setOnUnauthorized(fn: () => void): void {
   onUnauthorized = fn;
 }
 
+/** 可选：SPA 跳转登录页（由路由层设置，用于 401 时无刷新跳转） */
+let navigateToLogin: ((path: string) => void) | null = null;
+
+/**
+ * 设置 401 时用于跳转登录页的函数（如 react-router navigate）
+ */
+export function setNavigateToLogin(fn: (path: string) => void): void {
+  navigateToLogin = fn;
+}
+
 /**
  * 未登录/登录过期时统一处理：清除本地登录态并跳转登录（或执行已注册的回调）
  */
@@ -77,6 +87,9 @@ export function handleUnauthorized(): void {
   clearToken();
   if (onUnauthorized) {
     onUnauthorized();
+  } else if (navigateToLogin) {
+    const redirect = encodeURIComponent(window.location.pathname + window.location.search);
+    navigateToLogin(`/login?redirect=${redirect}`);
   } else {
     window.location.href = '/login';
   }
@@ -104,6 +117,17 @@ export interface ApiResponse<T = any> {
   code: number;
   message: string;
   data: T;
+}
+
+/** 接口业务错误（如 404），便于调用方区分处理 */
+export class ApiError extends Error {
+  constructor(
+    public code: number,
+    message: string
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
 }
 
 /**

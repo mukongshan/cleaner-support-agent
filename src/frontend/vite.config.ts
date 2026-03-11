@@ -7,6 +7,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
+    dedupe: ['react', 'react-dom', 'react-router-dom'],
     alias: {
       // 仅保留实际被业务代码使用到的包的版本别名
       'sonner@2.0.3': 'sonner',
@@ -25,6 +26,7 @@ export default defineConfig({
       'react',
       'react-dom',
       'react/jsx-runtime',
+      'react-router-dom',
       'motion/react',
       'react-markdown',
       'remark-gfm',

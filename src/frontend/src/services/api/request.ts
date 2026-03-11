@@ -2,7 +2,7 @@
  * HTTP 请求工具
  */
 
-import { API_BASE_URL, getToken, handleUnauthorized, ApiResponse, RequestConfig } from './config';
+import { API_BASE_URL, getToken, handleUnauthorized, ApiResponse, RequestConfig, ApiError } from './config';
 
 /**
  * 统一请求方法
@@ -50,6 +50,17 @@ export async function request<T = any>(
       ok: response.ok
     });
 
+    if (response.status === 404) {
+      let msg = '资源不存在';
+      try {
+        const body = await response.json();
+        if (body && typeof body.message === 'string') msg = body.message;
+      } catch {
+        // 非 JSON 或空 body 时使用默认文案
+      }
+      throw new ApiError(404, msg);
+    }
+
     // 解析响应
     const result: ApiResponse<T> = await response.json();
 
@@ -67,7 +78,12 @@ export async function request<T = any>(
       throw new Error('请先登录');
     }
 
-    // 处理业务错误
+    // 404 等资源不存在，抛出 ApiError 便于页面展示「工单不存在」等
+    if (result.code === 404) {
+      throw new ApiError(404, result.message || '资源不存在');
+    }
+
+    // 其他业务错误
     if (result.code !== 200) {
       console.error('[API Request] 业务错误', {
         url: fullUrl,

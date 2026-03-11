@@ -27,7 +27,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
-import { UserRole } from '../App';
+import type { UserRole } from '../types/app';
 import {
   sendAIMessage,
   stopAIMessage,
