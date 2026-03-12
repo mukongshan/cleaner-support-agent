@@ -130,7 +130,7 @@ function MainLayoutContent() {
   };
 
   return (
-    <div className="h-screen flex flex-col max-w-md mx-auto relative overflow-hidden">
+    <div className="global-layout-container h-screen flex flex-col mx-auto relative overflow-hidden md:border-x md:shadow-2xl bg-white/50">
       <Toaster
         position="top-center"
         richColors={false}
@@ -178,12 +178,12 @@ function MainLayoutContent() {
         />
       </div>
 
-      <div className="flex-1 relative z-10 overflow-hidden">
+      <div className="flex-1 relative z-10 overflow-hidden safe-area-top">
         <Outlet context={contextValue} />
       </div>
 
       <nav
-        className="safe-area-bottom relative z-10"
+        className="safe-area-bottom safe-area-x relative z-10"
         style={{
           backdropFilter: 'blur(12px)',
           backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -193,7 +193,7 @@ function MainLayoutContent() {
           <button
             type="button"
             onClick={() => navigate(ROUTES.CHAT)}
-            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors min-w-[44px] min-h-[44px] ${activeTab === '/chat' ? 'text-blue-600' : 'text-gray-500'}`}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 min-w-[44px] min-h-[44px] hover:bg-white/10 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-400 ${activeTab === '/chat' ? 'text-blue-600' : 'text-gray-500'}`}
           >
             <MessageSquare className={`w-6 h-6 mb-1 ${activeTab === '/chat' ? 'stroke-[2.5]' : ''}`} />
             <span className="text-xs">{t('tab_chat')}</span>
@@ -201,7 +201,7 @@ function MainLayoutContent() {
           <button
             type="button"
             onClick={() => navigate(ROUTES.KNOWLEDGE)}
-            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors min-w-[44px] min-h-[44px] ${activeTab === '/knowledge' ? 'text-blue-600' : 'text-gray-500'}`}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 min-w-[44px] min-h-[44px] hover:bg-white/10 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-400 ${activeTab === '/knowledge' ? 'text-blue-600' : 'text-gray-500'}`}
           >
             <BookOpen className={`w-6 h-6 mb-1 ${activeTab === '/knowledge' ? 'stroke-[2.5]' : ''}`} />
             <span className="text-xs">{t('tab_knowledge')}</span>
@@ -209,7 +209,7 @@ function MainLayoutContent() {
           <button
             type="button"
             onClick={() => navigate(ROUTES.TICKETS)}
-            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors min-w-[44px] min-h-[44px] ${activeTab === '/tickets' ? 'text-blue-600' : 'text-gray-500'}`}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 min-w-[44px] min-h-[44px] hover:bg-white/10 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-400 ${activeTab === '/tickets' ? 'text-blue-600' : 'text-gray-500'}`}
           >
             <ClipboardList className={`w-6 h-6 mb-1 ${activeTab === '/tickets' ? 'stroke-[2.5]' : ''}`} />
             <span className="text-xs">{t('tab_ticket')}</span>
@@ -217,7 +217,7 @@ function MainLayoutContent() {
           <button
             type="button"
             onClick={() => navigate(ROUTES.PROFILE)}
-            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors min-w-[44px] min-h-[44px] ${activeTab === '/profile' ? 'text-blue-600' : 'text-gray-500'}`}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 min-w-[44px] min-h-[44px] hover:bg-white/10 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-400 ${activeTab === '/profile' ? 'text-blue-600' : 'text-gray-500'}`}
           >
             <User className={`w-6 h-6 mb-1 ${activeTab === '/profile' ? 'stroke-[2.5]' : ''}`} />
             <span className="text-xs">{t('tab_profile')}</span>

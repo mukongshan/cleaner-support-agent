@@ -80,6 +80,8 @@ interface BackgroundSlot {
   isHistoryConversation: boolean;
   followUpQuestions: string[];
   currentMessageId: string | null;
+  /** 流开始时的临时 slotKey，用于在 conversation_id 到达前也能被 loadConversationDetail 按 sessionId 检索到 */
+  pendingSlotKey: string;
 }
 
 interface ChatPageProps {
@@ -615,6 +617,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
           isHistoryConversation,
           followUpQuestions: [...followUpQuestions],
           currentMessageId,
+          pendingSlotKey: slotKey, // 记录原始 slotKey，方便后续按 conversationId 补建映射
         };
         // 以 slotKey 存储（流式回调用此 key 路由更新）
         backgroundSlotsRef.current.set(slotKey, slot);
@@ -662,16 +665,31 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
   const loadConversationDetail = async (conversationId: string) => {
     // ── 优先检查后台槽位 ──────────────────────────────────────
     // 若该对话正在后台生成（用户新建了新对话但旧流仍在运行），直接从槽位恢复，无需网络请求
-    const bgSlot = backgroundSlotsRef.current.get(conversationId);
+    let bgSlot = backgroundSlotsRef.current.get(conversationId);
+
+    // 兜底：SSE 可能还没收到 conversation_id，槽位仍以临时 slotKey 存储
+    // 遍历所有槽位，按 sessionId 匹配；找到后建立正向映射，下次可直接命中
+    if (!bgSlot) {
+      for (const [, slot] of backgroundSlotsRef.current.entries()) {
+        if (slot.sessionId === conversationId) {
+          bgSlot = slot;
+          backgroundSlotsRef.current.set(conversationId, slot);
+          break;
+        }
+      }
+    }
     if (bgSlot) {
       // 将当前视图（若也在生成）转移到后台槽
       saveCurrentToBackground(false);
 
-      // 切换槽位标识，让旧对话的 SSE 回调重新路由到当前视图
-      currentSlotKeyRef.current = conversationId;
-      // 清理所有指向该槽位的 key（可能有 slotKey 和 conversationId 两个 key）
+      // ── 关键：用原始 slotKey（pendingSlotKey）切换槽位 ──────────────────────────
+      // SSE 回调（routeMessages / routeThinking 等）的闭包中捕获的是发送消息时的 slotKey。
+      // 只有 currentSlotKeyRef.current === slotKey 时，它们才直接 setMessages 到视图。
+      // 因此必须将 currentSlotKeyRef 设为 pendingSlotKey，而不是 conversationId。
+      currentSlotKeyRef.current = bgSlot.pendingSlotKey;
+      // 只删除 conversationId 别名 key；保留 pendingSlotKey，供 SSE 后续回调在后台时查找
       backgroundSlotsRef.current.forEach((v, k) => {
-        if (v === bgSlot) backgroundSlotsRef.current.delete(k);
+        if (v === bgSlot && k !== bgSlot.pendingSlotKey) backgroundSlotsRef.current.delete(k);
       });
 
       // 恢复后台槽位的状态到视图
@@ -688,10 +706,13 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
       return; // 无需网络请求
     }
 
-    // ── 无后台槽位：取消当前流，拉取历史数据 ──────────────────
-    // 取消旧流（若有），切往纯历史对话
-    saveCurrentToBackground(true);
-    // 将当前视图切换到新槽位，防止旧流回调（若取消有延迟）污染新视图
+
+    // ── 无后台槽位：保留当前流在后台，拉取目标历史数据到前台 ──────────────────
+    // 注意：不能调用 saveCurrentToBackground(true) ——那会 abort() 前端 fetch，
+    //       触发后端 emitter.onError → difyClient.cancelStream，Dify 生成被中断，回复不入库。
+    // 正确做法：保留流继续在后台运行（后端自行完成生成并入库），仅切换前台视图。
+    saveCurrentToBackground(false);
+    // 切换到目标会话的新槽位，防止旧流回调污染新视图
     currentSlotKeyRef.current = conversationId;
     setAiThinking(false);
     setThinkingPaused(false);
@@ -1245,7 +1266,14 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
         activeConvIdRef.current = id;
       } else {
         const slot = backgroundSlotsRef.current.get(slotKey);
-        if (slot) { slot.sessionId = id; slot.activeConvId = id; }
+        if (slot) {
+          slot.sessionId = id;
+          slot.activeConvId = id;
+          // 补建 conversationId → slot 的正向映射，让 loadConversationDetail 切回时能直接命中
+          if (!backgroundSlotsRef.current.has(id)) {
+            backgroundSlotsRef.current.set(id, slot);
+          }
+        }
       }
     };
 
@@ -1649,11 +1677,10 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
                 updatedAt: new Date()
               };
               setChatSessions(prev => [newSession, ...prev]);
-              // 同步后台槽位的 slotKey（使 loadConversationDetail 能用 conversationId 找到它）
+              // 同步后台槽位：以 conversationId 为别名建立映射（保留 slotKey 映射，route* 函数仍需通过它写入数据）
               if (currentSlotKeyRef.current !== slotKey) {
                 const slot = backgroundSlotsRef.current.get(slotKey);
-                if (slot) {
-                  backgroundSlotsRef.current.delete(slotKey);
+                if (slot && !backgroundSlotsRef.current.has(event.conversation_id)) {
                   backgroundSlotsRef.current.set(event.conversation_id, slot);
                 }
               }
@@ -1684,8 +1711,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
               setChatSessions(prev => [newSession, ...prev]);
               if (currentSlotKeyRef.current !== slotKey) {
                 const slot = backgroundSlotsRef.current.get(slotKey);
-                if (slot) {
-                  backgroundSlotsRef.current.delete(slotKey);
+                if (slot && !backgroundSlotsRef.current.has(event.conversation_id)) {
                   backgroundSlotsRef.current.set(event.conversation_id, slot);
                 }
               }
@@ -2838,7 +2864,7 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
       </AnimatePresence>
       {/* 输入区域 */}
       <div
-        className="px-4 py-3 pb-safe relative z-10"
+        className="px-4 py-3 safe-area-bottom safe-area-x relative z-10"
         style={{
           backdropFilter: 'blur(12px)',
           backgroundColor: 'rgba(255, 255, 255, 0.1)'
