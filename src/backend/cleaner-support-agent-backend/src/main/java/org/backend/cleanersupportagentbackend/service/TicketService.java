@@ -14,6 +14,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -71,8 +72,9 @@ public class TicketService {
     }
 
     /**
-     * 获取工单详情
+     * 获取工单详情（只读事务内访问懒加载的 attachmentUrls 与 user）
      */
+    @Transactional(readOnly = true)
     public TicketDetailResponse getTicketDetail(String userId, String ticketId) {
         User user = userService.getUserByUserId(userId);
         Ticket ticket = ticketRepository.findByTicketId(ticketId)
@@ -83,6 +85,11 @@ public class TicketService {
             throw new RuntimeException("无权访问该工单");
         }
         
+        // 复制附件列表为普通 ArrayList，避免 DTO 持有 Hibernate 集合导致序列化时 no Session
+        List<String> attachmentList = ticket.getAttachmentUrls() != null
+                ? new ArrayList<>(ticket.getAttachmentUrls())
+                : new ArrayList<>();
+
         return TicketDetailResponse.builder()
                 .ticketId(ticket.getTicketId())
                 .title(ticket.getTitle())
@@ -93,7 +100,7 @@ public class TicketService {
                 .updatedAt(ticket.getUpdatedAt())
                 .engineerName(ticket.getEngineerName())
                 .estimatedTime(ticket.getEstimatedTime())
-                .attachments(ticket.getAttachmentUrls())
+                .attachments(attachmentList)
                 .comments(ticket.getComments())
                 .build();
     }

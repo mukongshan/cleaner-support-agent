@@ -29,10 +29,10 @@ export function NotFoundPage({ message }: NotFoundPageProps) {
         </button>
         <button
           type="button"
-          onClick={() => navigate(ROUTES.TICKETS)}
+          onClick={() => (window.history.length > 1 ? navigate(-1) : navigate(ROUTES.CHAT))}
           className="w-full py-3 px-4 rounded-xl border border-gray-300 text-gray-700 font-medium"
         >
-          返回工单列表
+          返回上一页
         </button>
       </div>
     </div>
