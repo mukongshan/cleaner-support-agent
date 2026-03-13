@@ -28,8 +28,8 @@ function LoginPageWrapper() {
   return (
     <LoginPage
       onLoginSuccess={onSuccess}
-      onClose={() => navigate(ROUTES.CHAT)}
-      onSwitchToRegister={() => navigate(ROUTES.REGISTER)}
+      onClose={() => navigate(-1)}
+      onSwitchToRegister={() => navigate(ROUTES.REGISTER, { replace: true })}
     />
   );
 }
@@ -46,8 +46,8 @@ function RegisterPageWrapper() {
   return (
     <RegisterPage
       onRegisterSuccess={onSuccess}
-      onClose={() => navigate(ROUTES.CHAT)}
-      onSwitchToLogin={() => navigate(ROUTES.LOGIN)}
+      onClose={() => navigate(-1)}
+      onSwitchToLogin={() => navigate(ROUTES.LOGIN, { replace: true })}
     />
   );
 }
@@ -131,24 +131,6 @@ function MainLayoutContent() {
 
   return (
     <div className="global-layout-container h-screen flex flex-col mx-auto relative overflow-hidden md:border-x md:shadow-2xl bg-white/50">
-      <Toaster
-        position="top-center"
-        richColors={false}
-        icons={{ success: null, error: null, warning: null, info: null, loading: null }}
-        toastOptions={{
-          unstyled: true,
-          style: { zIndex: 99999 },
-          classNames: {
-            toast: 'rounded-xl shadow-lg px-4 py-3 border min-w-[280px] bg-gray-50 border-gray-200 text-gray-700',
-            title: 'text-center',
-            description: 'text-center',
-            error: 'bg-red-50 border-red-500 text-red-700',
-            success: 'bg-green-50 border-green-500 text-green-700',
-            warning: 'bg-yellow-50 border-yellow-500 text-yellow-800',
-            info: 'bg-gray-50 border-gray-200 text-gray-700',
-          },
-        }}
-      />
       <div
         className="fixed inset-0 z-0"
         style={{

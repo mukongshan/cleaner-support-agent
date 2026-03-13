@@ -42,7 +42,7 @@ export function pathnameToTab(pathname: string): TabPath | null {
 }
 
 /** 需登录才能访问的路径前缀（除登录/注册外） */
-export const AUTH_REQUIRED_PATHS = ['/chat', '/knowledge', '/tickets', '/profile'] as const;
+export const AUTH_REQUIRED_PATHS = [] as const;
 
 export function isAuthRequiredPath(pathname: string): boolean {
   return AUTH_REQUIRED_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));

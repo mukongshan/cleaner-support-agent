@@ -21,7 +21,13 @@ import { Button } from './ui/button';
 import { useLanguage } from '../contexts/LanguageContext';
 
 export function KnowledgePage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  
+  // 更新页面标题
+  useEffect(() => {
+    document.title = `${t('knowledge_center_title')} - ${t('app_name')}`;
+  }, [language, t]);
+
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
@@ -75,8 +81,8 @@ export function KnowledgePage() {
     setLoading(true);
     setError(null);
     try {
-      const category = categories.find(c => c.id === selectedCategory)?.backendCategory ?? null;
-      const query = debouncedSearchQuery.trim() || null;
+      const category = categories.find(c => c.id === selectedCategory)?.backendCategory ?? undefined;
+      const query = debouncedSearchQuery.trim() || undefined;
 
       console.log('[KnowledgePage] 开始加载文件列表', {
         selectedCategory,

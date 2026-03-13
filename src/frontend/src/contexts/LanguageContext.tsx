@@ -28,7 +28,7 @@ const translations = {
     confirm_new_chat_desc: '当前对话记录将被保存。您确定要开始新的对话吗？',
     cancel: '取消',
     confirm: '确认',
-    no_conversations: '还没有对话记录',
+    no_conversations: '创建新对话',
     no_conversations_desc: '试试下面的常见问题，或者直接向我提问',
     loading_conversation: '加载对话记录中...',
     no_history: '暂无历史对话记录',
@@ -182,6 +182,10 @@ const translations = {
     login_required: '去登录',
     login_desc: '登录后享受完整服务',
     role_current_identity: '当前身份',
+    share: '分享智能清洁助手',
+    share_copy_success: '已复制分享链接到剪贴板',
+    share_copy_failed: '复制失败，请重试',
+    share_text: '欢迎使用智能清洁助手',
 
     // Login & Register
     login: '登录',
@@ -276,7 +280,7 @@ const translations = {
     confirm_new_chat_desc: 'Current conversation will be saved. Are you sure you want to start a new conversation?',
     cancel: 'Cancel',
     confirm: 'Confirm',
-    no_conversations: 'No conversations yet',
+    no_conversations: 'Create a new conversation',
     no_conversations_desc: 'Try the common questions below, or ask me directly',
     loading_conversation: 'Loading conversation...',
     no_history: 'No conversation history',
@@ -430,6 +434,10 @@ const translations = {
     login_required: 'Login',
     login_desc: 'Login to enjoy full service',
     role_current_identity: 'Current Role',
+    share: 'Share AI Assistant',
+    share_copy_success: 'Share link copied to clipboard',
+    share_copy_failed: 'Failed to copy, please try again',
+    share_text: 'Welcome to AI Assistant',
 
     // Login & Register
     login: 'Login',

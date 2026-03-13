@@ -62,6 +62,12 @@ interface TicketsPageProps {
 
 export function TicketsPage({ onTicketClick, onCreateTicket, onGoToChat, isLoggedIn = false, onShowLogin }: TicketsPageProps) {
   const { t, language } = useLanguage();
+
+  // 更新页面标题
+  useEffect(() => {
+    document.title = `${t('tab_ticket')} - ${t('app_name')}`;
+  }, [language, t]);
+
   const [selectedFilter, setSelectedFilter] = useState<'all' | TicketStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [ticketFeedbacks, setTicketFeedbacks] = useState<Record<string, 'like' | 'dislike' | null>>({});

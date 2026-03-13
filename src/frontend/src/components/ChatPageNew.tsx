@@ -364,6 +364,12 @@ function AIMarkdownContent({ content }: { content: string }) {
 
 export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTicket, userRole, isLoggedIn = false, onShowLogin, onSaveInput }: ChatPageProps) {
   const { t, language } = useLanguage();
+
+  // 更新页面标题
+  useEffect(() => {
+    document.title = `${t('tab_chat')} - ${t('app_name')}`;
+  }, [language, t]);
+
   // 聊天会话管理
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -2219,24 +2225,36 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
           </div>
         ) : messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-6">
-            <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-              <AIAvatar className="w-12 h-12" />
-            </div>
+            <AIAvatar className="w-20 h-20 mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-1">{t('no_conversations')}</h3>
-            <p className="text-sm text-gray-500 mb-6">
-              {t('no_conversations_desc')}
-            </p>
-            <div className="w-full grid grid-cols-2 gap-2">
-              {suggestedQuestions.map((q) => (
+            {isLoggedIn && (
+              <p className="text-sm text-gray-500 mb-6">
+                {t('no_conversations_desc')}
+              </p>
+            )}
+            {!isLoggedIn ? (
+              <div className="mb-6 flex flex-col items-center gap-3 w-full">
                 <button
-                  key={q}
-                  onClick={() => setInputText(q)}
-                  className="text-left text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl px-3 py-2.5 transition-colors leading-snug"
+                  onClick={onShowLogin}
+                  className="w-full max-w-[200px] py-2.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors shadow-sm active:scale-95"
                 >
-                  {q}
+                  {t('login_required')}
                 </button>
-              ))}
-            </div>
+                <span className="text-xs text-gray-400">{t('login_desc')}</span>
+              </div>
+            ) : (
+              <div className="w-full grid grid-cols-2 gap-2">
+                {suggestedQuestions.map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => setInputText(q)}
+                    className="text-left text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl px-3 py-2.5 transition-colors leading-snug"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           messages.map((message, index) => {

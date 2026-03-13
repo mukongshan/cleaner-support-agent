@@ -22,8 +22,10 @@ import {
   Camera,
   Loader,
   Check,
-  AlignVerticalJustifyStart
+  AlignVerticalJustifyStart,
+  Share2
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import type { UserRole } from '../types/app';
 import { clearToken, getUserProfile, updateUserProfile, UserProfile, uploadMedia, API_BASE_URL } from '../services/api';
@@ -47,6 +49,11 @@ export function ProfilePage({ userRole, onRoleChange, onLogout, isLoggedIn, onSh
   const [showLanguageSelection, setShowLanguageSelection] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // 更新页面标题
+  useEffect(() => {
+    document.title = `${t('tab_profile')} - ${t('app_name')}`;
+  }, [language, t]);
 
   // 个人信息状态（使用模拟数据初始化）
   const [personalInfo, setPersonalInfo] = useState({
@@ -163,6 +170,18 @@ export function ProfilePage({ userRole, onRoleChange, onLogout, isLoggedIn, onSh
     setShowSettings(false); // 关闭设置页面
     if (onLogout) {
       onLogout();
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      const url = `${window.location.origin}/chat`;
+      const text = `${t('share_text')} ${url}`;
+      await navigator.clipboard.writeText(text);
+      toast.success(t('share_copy_success'), { duration: 1000 });
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+      toast.error(t('share_copy_failed'));
     }
   };
 
@@ -369,7 +388,7 @@ export function ProfilePage({ userRole, onRoleChange, onLogout, isLoggedIn, onSh
       </div> */}
 
       {/* 服务管理 */}
-      <div className="px-4">
+      <div className="px-4 flex flex-col gap-4">
         <div
           className="rounded-2xl overflow-hidden"
           style={{
@@ -388,6 +407,29 @@ export function ProfilePage({ userRole, onRoleChange, onLogout, isLoggedIn, onSh
                 <Settings className="w-5 h-5 text-gray-600" />
               </div>
               <span className="text-sm font-medium text-gray-900">{t('settings')}</span>
+            </div>
+            <ChevronRight className="w-5 h-5 text-gray-400" />
+          </button>
+        </div>
+
+        {/* 分享智能清洁助手 */}
+        <div
+          className="rounded-2xl overflow-hidden"
+          style={{
+            backdropFilter: 'blur(8px)',
+            backgroundColor: 'rgba(255, 255, 255, 0.8)',
+            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+          }}
+        >
+          <button
+            onClick={handleShare}
+            className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors haptic-feedback"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                <Share2 className="w-5 h-5 text-gray-600" />
+              </div>
+              <span className="text-sm font-medium text-gray-900">{t('share')}</span>
             </div>
             <ChevronRight className="w-5 h-5 text-gray-400" />
           </button>
