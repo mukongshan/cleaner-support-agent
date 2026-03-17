@@ -130,8 +130,35 @@ function MainLayoutContent() {
   };
 
   return (
-    <div className="global-layout-container h-screen flex flex-col mx-auto relative overflow-hidden md:border-x md:shadow-2xl bg-white">
-      <div className="fixed inset-0 z-0" style={{ backgroundColor: '#ffffff' }} />
+    <div className="global-layout-container h-screen flex flex-col mx-auto relative overflow-hidden md:border-x md:shadow-2xl bg-white/50">
+      <div
+        className="fixed inset-0 z-0"
+        style={{
+          backgroundColor: '#F5F7FA',
+          background: `
+            radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.4) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(147, 197, 253, 0.4) 0%, transparent 50%),
+            #F5F7FA
+          `,
+        }}
+      >
+        <div
+          className="absolute top-0 left-0 w-[400px] h-[400px] rounded-full"
+          style={{
+            background: 'radial-gradient(circle, rgba(59, 130, 246, 0.4) 0%, transparent 70%)',
+            filter: 'blur(100px)',
+            transform: 'translate(-20%, -20%)',
+          }}
+        />
+        <div
+          className="absolute top-0 right-0 w-[400px] h-[400px] rounded-full"
+          style={{
+            background: 'radial-gradient(circle, rgba(147, 197, 253, 0.4) 0%, transparent 70%)',
+            filter: 'blur(100px)',
+            transform: 'translate(20%, -20%)',
+          }}
+        />
+      </div>
 
       <div className="flex-1 relative z-10 overflow-hidden safe-area-top">
         <Outlet context={contextValue} />

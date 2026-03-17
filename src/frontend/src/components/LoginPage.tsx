@@ -260,7 +260,7 @@ export function LoginPage({ onLoginSuccess, onClose, onSwitchToRegister }: Login
                                     lineHeight: 1,
                                 }}
                             >
-                                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                {showPassword ? <EyeOff size={20} strokeWidth={1} /> : <Eye size={20} strokeWidth={1} />}
                             </button>
                         }
                     />

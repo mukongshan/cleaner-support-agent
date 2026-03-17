@@ -270,7 +270,7 @@ export function RegisterPage({ onRegisterSuccess, onClose, onSwitchToLogin }: Re
                                     lineHeight: 1,
                                 }}
                             >
-                                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                {showPassword ? <EyeOff size={20} strokeWidth={1} /> : <Eye size={20} strokeWidth={1} />}
                             </button>
                         }
                     />
@@ -295,7 +295,7 @@ export function RegisterPage({ onRegisterSuccess, onClose, onSwitchToLogin }: Re
                                     lineHeight: 1,
                                 }}
                             >
-                                {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                {showConfirmPassword ? <EyeOff size={20} strokeWidth={1} /> : <Eye size={20} strokeWidth={1} />}
                             </button>
                         }
                     />

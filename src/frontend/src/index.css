@@ -1888,3 +1888,14 @@ html, body {
 body {
   touch-action: pan-y;
 }
+
+/* 隐藏浏览器原生密码框眼睛图标（Edge/IE、Chrome） */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
+input[type="password"]::-webkit-credentials-auto-fill-button {
+  display: none !important;
+  visibility: hidden;
+  pointer-events: none;
+}
