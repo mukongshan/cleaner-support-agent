@@ -16,6 +16,102 @@ interface LoginPageProps {
     onSwitchToRegister?: () => void;
 }
 
+// 浮动标签输入框组件
+interface FloatFieldProps {
+    label: string;
+    value: string;
+    type?: string;
+    maxLength?: number;
+    onKeyDown?: (e: React.KeyboardEvent) => void;
+    onChange: (v: string) => void;
+    suffix?: React.ReactNode;
+}
+
+function FloatField({ label, value, type = 'text', maxLength, onKeyDown, onChange, suffix }: FloatFieldProps) {
+    const [focused, setFocused] = useState(false);
+    const lifted = focused || value.length > 0;
+
+    return (
+        <div style={{ position: 'relative', paddingTop: '22px', marginBottom: '3.2vh' }}>
+            {/* 浮动标签 */}
+            <label
+                style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: lifted ? '0px' : '22px',
+                    fontSize: lifted ? '10px' : '15px',
+                    fontWeight: lifted ? 700 : 400,
+                    color: focused ? '#1a1a1a' : '#999999',
+                    letterSpacing: lifted ? '0.12em' : '0',
+                    textTransform: lifted ? 'uppercase' : 'none',
+                    pointerEvents: 'none',
+                    transition: 'top 0.22s ease, font-size 0.22s ease, color 0.22s ease, letter-spacing 0.22s ease',
+                    lineHeight: 1,
+                }}
+            >
+                {label}
+            </label>
+
+            {/* 输入框（无边框，靠下方线条） */}
+            <input
+                type={type}
+                value={value}
+                maxLength={maxLength}
+                onKeyDown={onKeyDown}
+                onChange={e => onChange(e.target.value)}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                style={{
+                    display: 'block',
+                    width: '100%',
+                    background: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    paddingBottom: '10px',
+                    paddingRight: suffix ? '28px' : '0',
+                    fontSize: '15px',
+                    color: '#1a1a1a',
+                    caretColor: '#1a1a1a',
+                    boxSizing: 'border-box',
+                }}
+            />
+
+            {/* 右侧附加元素（密码眼睛图标） */}
+            {suffix && (
+                <div style={{
+                    position: 'absolute',
+                    right: 0,
+                    bottom: '10px',
+                    lineHeight: 1,
+                }}>
+                    {suffix}
+                </div>
+            )}
+
+            {/* 静态底线 */}
+            <div style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: '1px',
+                backgroundColor: '#d0d0d0',
+            }} />
+
+            {/* 动态扩展线 — 从中心向两侧展开 */}
+            <div style={{
+                position: 'absolute',
+                bottom: 0,
+                left: focused ? '0%' : '50%',
+                right: focused ? '0%' : '50%',
+                height: '2px',
+                backgroundColor: '#1a1a1a',
+                transition: 'left 0.28s cubic-bezier(0.4,0,0.2,1), right 0.28s cubic-bezier(0.4,0,0.2,1)',
+            }} />
+        </div>
+    );
+}
+
 export function LoginPage({ onLoginSuccess, onClose, onSwitchToRegister }: LoginPageProps) {
     const { t } = useLanguage();
     const [phone, setPhone] = useState('');
@@ -23,44 +119,30 @@ export function LoginPage({ onLoginSuccess, onClose, onSwitchToRegister }: Login
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    // 更新页面标题
     useEffect(() => {
         document.title = `${t('login')} - ${t('app_name')}`;
     }, [t]);
 
     const handleLogin = async () => {
-        // 表单验证
         if (!phone.trim()) {
             toast.error(t('validation_phone_required'));
             return;
         }
-
         if (!/^1[3-9]\d{9}$/.test(phone)) {
             toast.error(t('validation_phone_invalid'));
             return;
         }
-
         if (!password.trim()) {
             toast.error(t('validation_password_required'));
             return;
         }
-
         if (password.length < 6) {
             toast.error(t('validation_password_min6'));
             return;
         }
-
         try {
             setLoading(true);
-
-            // 调用登录 API
-            await login({
-                username: phone,
-                password: password,
-                loginType: 'password'
-            });
-
-            // 登录成功
+            await login({ username: phone, password: password, loginType: 'password' });
             onLoginSuccess();
         } catch (err: any) {
             toast.error(err.message || t('login_failed_default'));
@@ -69,149 +151,188 @@ export function LoginPage({ onLoginSuccess, onClose, onSwitchToRegister }: Login
         }
     };
 
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            handleLogin();
-        }
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') handleLogin();
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-gray-50/30 safe-area-top"
-            style={{
-                background: `
-                    radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.4) 0%, transparent 50%),
-                    radial-gradient(circle at 80% 20%, rgba(147, 197, 253, 0.4) 0%, transparent 50%),
-                    #F5F7FA
-                `
-            }}
+        <div
+            className="fixed inset-0 z-50 flex flex-col"
+            style={{ backgroundColor: '#ffffff' }}
         >
-            {/* 动态背景光晕 */}
+            {/* 顶部导航栏 */}
             <div
-                className="absolute top-0 left-0 w-[400px] h-[400px] rounded-full pointer-events-none"
+                className="shrink-0 flex items-center"
                 style={{
-                    background: 'radial-gradient(circle, rgba(59, 130, 246, 0.4) 0%, transparent 70%)',
-                    filter: 'blur(100px)',
-                    transform: 'translate(-20%, -20%)',
-                }}
-            />
-            <div
-                className="absolute top-0 right-0 w-[400px] h-[400px] rounded-full pointer-events-none"
-                style={{
-                    background: 'radial-gradient(circle, rgba(147, 197, 253, 0.4) 0%, transparent 70%)',
-                    filter: 'blur(100px)',
-                    transform: 'translate(20%, -20%)',
-                }}
-            />
-
-            {/* 顶部固定导航栏 (与主界面类似) */}
-            <div className="w-full px-4 py-4 relative z-20 flex items-center gap-3 shrink-0"
-                style={{
-                    backdropFilter: 'blur(12px)',
-                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                    backgroundColor: '#ffffff',
+                    paddingTop: 'calc(env(safe-area-inset-top, 0px) + 14px)',
+                    paddingBottom: '14px',
+                    paddingLeft: '2.5%',
+                    paddingRight: '3%',
                 }}
             >
                 {onClose && (
                     <button
                         onClick={onClose}
-                        className="p-2 -ml-2 hover:bg-white/30 rounded-xl transition-colors haptic-feedback"
+                        className="transition-opacity hover:opacity-40"
+                        style={{ color: '#1a1a1a', marginRight: '20px' }}
                     >
-                        <ArrowLeft className="w-5 h-5 text-gray-700" />
+                        <ArrowLeft className="w-5 h-5" />
                     </button>
                 )}
-                <h2 className="text-lg font-semibold text-gray-900">{t('login')}</h2>
-            </div>
-            
-            {/* 中间内容区域 */}
-            <div className="flex-1 overflow-y-auto flex px-4 pt-12 pb-[20vh] relative z-10 w-full justify-center">
-                <motion.div 
-                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-                    className="w-full max-w-md flex flex-col"
+                <span
+                    style={{
+                        color: '#1a1a1a',
+                        fontSize: '18px',
+                        fontWeight: 1000,
+                        letterSpacing: '0.08em',
+                    }}
                 >
-                    {/* 表单内容 */}
-                    <div className="px-4 py-4">
-                        {/* 标题 */}
-                        <div className="text-left mb-10">
-                            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">登录智能清洁助手</h1>
-                        </div>
+                    智能清洁助手
+                </span>
+            </div>
 
-                        {/* 手机号输入 */}
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                {t('login_phone_label')}
-                            </label>
-                            <input
-                                type="tel"
-                                value={phone}
-                                onChange={(e) => {
-                                    setPhone(e.target.value);
-                                }}
-                                onKeyPress={handleKeyPress}
-                                placeholder={t('login_phone_placeholder')}
-                                maxLength={11}
-                                className="w-full px-4 py-3 bg-white hover:bg-gray-50 focus:bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-sm shadow-sm text-gray-800 placeholder:text-gray-400"
-                            />
-                        </div>
+            {/* 主体内容 */}
+            <div
+                className="flex-1 overflow-y-auto flex flex-col"
+                style={{
+                    paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 40px)',
+                }}
+            >
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+                    style={{
+                        width: 'min(85%, 760px)',
+                        margin: '0 auto',
+                        paddingTop: '4vh',
+                        paddingLeft: '7%',
+                        paddingRight: '7%',
+                        paddingBottom: '5vh',
+                        marginBottom: '4vh',
+                    }}
+                >
+                    {/* 页面标题 */}
+                    <h1
+                        style={{
+                            fontSize: '35px',
+                            fontWeight: 50,
+                            color: '#1a1a1a',
+                            letterSpacing: '0.12em',
+                            lineHeight: 1.2,
+                            textAlign: 'center',
+                            marginBottom: '4vh',
+                            // textShadow: '0 1px 0 rgba(0,0,0,0.08), 1px 1px 0 rgba(0,0,0,0.04)',
+                            WebkitTextStroke: '0.3px rgba(0,0,0,0.15)',
+                        }}
+                    >
+                        登录
+                    </h1>
 
-                        {/* 密码输入 */}
-                        <div className="mb-6">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                {t('login_password_label')}
-                            </label>
-                            <div className="relative">
-                                <input
-                                    type={showPassword ? 'text' : 'password'}
-                                    value={password}
-                                    onChange={(e) => {
-                                        setPassword(e.target.value);
-                                    }}
-                                    onKeyPress={handleKeyPress}
-                                    placeholder={t('login_password_placeholder')}
-                                    className="w-full px-4 pr-12 py-3 bg-white hover:bg-gray-50 focus:bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-sm shadow-sm text-gray-800 placeholder:text-gray-400"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                                >
-                                    {showPassword ? (
-                                        <EyeOff className="w-5 h-5" />
-                                    ) : (
-                                        <Eye className="w-5 h-5" />
-                                    )}
-                                </button>
-                            </div>
-                        </div>
+                    {/* 手机号浮动输入框 */}
+                    <FloatField
+                        label="手机号码"
+                        value={phone}
+                        type="tel"
+                        maxLength={11}
+                        onKeyDown={handleKeyDown}
+                        onChange={setPhone}
+                    />
 
-                        {/* 去注册提示 */}
-                        <div className="mb-6 flex justify-end">
+                    {/* 密码浮动输入框 */}
+                    <FloatField
+                        label="密码"
+                        value={password}
+                        type={showPassword ? 'text' : 'password'}
+                        onKeyDown={handleKeyDown}
+                        onChange={setPassword}
+                        suffix={
                             <button
-                                onClick={onSwitchToRegister}
-                                className="text-sm text-blue-600 hover:text-blue-700 transition-colors"
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                style={{
+                                    color: '#aaaaaa',
+                                    background: 'none',
+                                    border: 'none',
+                                    padding: 0,
+                                    cursor: 'pointer',
+                                    lineHeight: 1,
+                                }}
                             >
-                                {t('login_no_account_register')}
+                                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                             </button>
-                        </div>
+                        }
+                    />
 
+                    {/* 按钮组 */}
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '12px',
+                        marginTop: '1vh',
+                    }}>
                         {/* 登录按钮 */}
-                        <div className="mt-8">
-                            <motion.button
-                                whileTap={{ scale: 0.98 }}
-                                onClick={handleLogin}
-                                disabled={loading}
-                                className="w-full bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 shadow-md shadow-blue-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 haptic-feedback"
-                            >
+                        <motion.button
+                            whileTap={{ scale: 0.99 }}
+                            onClick={handleLogin}
+                            disabled={loading}
+                            className="disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                width: '50%',
+                                height: '48px',
+                                backgroundColor: '#000000',
+                                color: '#ffffff',
+                                border: 'none',
+                                fontSize: '14px',
+                                fontWeight: 700,
+                                letterSpacing: '0.18em',
+                                textTransform: 'uppercase',
+                                cursor: 'pointer',
+                                transition: 'background-color 0.18s ease',
+                            }}
+                            onMouseEnter={e => { if (!loading) (e.currentTarget.style.backgroundColor = '#505050'); }}
+                            onMouseLeave={e => { if (!loading) (e.currentTarget.style.backgroundColor = '#000000'); }}
+                        >
                             {loading ? (
                                 <>
-                                    <Loader className="w-5 h-5 animate-spin" />
-                                    <span>{t('logging_in')}</span>
+                                    <Loader size={14} className="animate-spin" />
+                                    <span>登录中</span>
                                 </>
                             ) : (
-                                <span>{t('login')}</span>
+                                <span>登录</span>
                             )}
-                            </motion.button>
-                        </div>
+                        </motion.button>
+
+                        {/* 注册按钮 */}
+                        <button
+                            onClick={onSwitchToRegister}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '50%',
+                                height: '48px',
+                                backgroundColor: 'transparent',
+                                color: '#1a1a1a',
+                                border: '1px solid #1a1a1a',
+                                fontSize: '14px',
+                                fontWeight: 700,
+                                letterSpacing: '0.18em',
+                                textTransform: 'uppercase',
+                                cursor: 'pointer',
+                                transition: 'opacity 0.18s ease',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.opacity = '0.55'; }}
+                            onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
+                        >
+                            创建账号
+                        </button>
                     </div>
                 </motion.div>
             </div>

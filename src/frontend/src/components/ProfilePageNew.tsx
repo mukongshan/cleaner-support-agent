@@ -240,7 +240,20 @@ export function ProfilePage({ userRole, onRoleChange, onLogout, isLoggedIn, onSh
             <div className="flex-1">
               <button
                 onClick={onShowLogin}
-                className="px-6 py-2 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors haptic-feedback"
+                style={{
+                  backgroundColor: '#000000',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '8px 28px',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  letterSpacing: '0.12em',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.18s ease',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#505050')}
+                onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#000000')}
               >
                 {t('login_required')}
               </button>

@@ -13,7 +13,7 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 const translations = {
   zh: {
     // App & Navigation
-    app_name: 'AI 智能助手',
+    app_name: '智能清洁助手',
     tab_chat: '问答',
     tab_knowledge: '知识库',
     tab_ticket: '工单',

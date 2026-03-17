@@ -2236,7 +2236,22 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
               <div className="mb-6 flex flex-col items-center gap-3 w-full">
                 <button
                   onClick={onShowLogin}
-                  className="w-full max-w-[200px] py-2.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors shadow-sm active:scale-95"
+                  style={{
+                    backgroundColor: '#000000',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '10px 32px',
+                    fontSize: '14px',
+                    fontWeight: 700,
+                    letterSpacing: '0.12em',
+                    cursor: 'pointer',
+                    maxWidth: '240px',
+                    width: '100%',
+                    transition: 'background-color 0.18s ease',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#505050')}
+                  onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#000000')}
                 >
                   {t('login_required')}
                 </button>
@@ -2882,10 +2897,11 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
       </AnimatePresence>
       {/* 输入区域 */}
       <div
-        className="px-4 py-3 safe-area-bottom safe-area-x relative z-10"
+        className="px-4 pt-3 safe-area-x relative z-10"
         style={{
           backdropFilter: 'blur(12px)',
-          backgroundColor: 'rgba(255, 255, 255, 0.1)'
+          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)'
         }}
       >
         {/* 图片缩略图区域（在输入框上方） */}

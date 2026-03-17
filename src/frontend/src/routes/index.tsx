@@ -130,35 +130,8 @@ function MainLayoutContent() {
   };
 
   return (
-    <div className="global-layout-container h-screen flex flex-col mx-auto relative overflow-hidden md:border-x md:shadow-2xl bg-white/50">
-      <div
-        className="fixed inset-0 z-0"
-        style={{
-          backgroundColor: '#F5F7FA',
-          background: `
-            radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.4) 0%, transparent 50%),
-            radial-gradient(circle at 80% 20%, rgba(147, 197, 253, 0.4) 0%, transparent 50%),
-            #F5F7FA
-          `,
-        }}
-      >
-        <div
-          className="absolute top-0 left-0 w-[400px] h-[400px] rounded-full"
-          style={{
-            background: 'radial-gradient(circle, rgba(59, 130, 246, 0.4) 0%, transparent 70%)',
-            filter: 'blur(100px)',
-            transform: 'translate(-20%, -20%)',
-          }}
-        />
-        <div
-          className="absolute top-0 right-0 w-[400px] h-[400px] rounded-full"
-          style={{
-            background: 'radial-gradient(circle, rgba(147, 197, 253, 0.4) 0%, transparent 70%)',
-            filter: 'blur(100px)',
-            transform: 'translate(20%, -20%)',
-          }}
-        />
-      </div>
+    <div className="global-layout-container h-screen flex flex-col mx-auto relative overflow-hidden md:border-x md:shadow-2xl bg-white">
+      <div className="fixed inset-0 z-0" style={{ backgroundColor: '#ffffff' }} />
 
       <div className="flex-1 relative z-10 overflow-hidden safe-area-top">
         <Outlet context={contextValue} />
@@ -175,7 +148,7 @@ function MainLayoutContent() {
           <button
             type="button"
             onClick={() => navigate(ROUTES.CHAT)}
-            className={`flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 min-w-[44px] min-h-[44px] hover:bg-white/10 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-400 ${activeTab === '/chat' ? 'text-blue-600' : 'text-gray-500'}`}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 min-w-[44px] min-h-[44px] hover:bg-black/5 active:scale-95 focus-visible:ring-2 focus-visible:ring-gray-400 ${activeTab === '/chat' ? 'text-gray-950' : 'text-gray-600'}`}
           >
             <MessageSquare className={`w-6 h-6 mb-1 ${activeTab === '/chat' ? 'stroke-[2.5]' : ''}`} />
             <span className="text-xs">{t('tab_chat')}</span>
@@ -183,7 +156,7 @@ function MainLayoutContent() {
           <button
             type="button"
             onClick={() => navigate(ROUTES.KNOWLEDGE)}
-            className={`flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 min-w-[44px] min-h-[44px] hover:bg-white/10 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-400 ${activeTab === '/knowledge' ? 'text-blue-600' : 'text-gray-500'}`}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 min-w-[44px] min-h-[44px] hover:bg-black/5 active:scale-95 focus-visible:ring-2 focus-visible:ring-gray-400 ${activeTab === '/knowledge' ? 'text-gray-950' : 'text-gray-600'}`}
           >
             <BookOpen className={`w-6 h-6 mb-1 ${activeTab === '/knowledge' ? 'stroke-[2.5]' : ''}`} />
             <span className="text-xs">{t('tab_knowledge')}</span>
@@ -191,7 +164,7 @@ function MainLayoutContent() {
           <button
             type="button"
             onClick={() => navigate(ROUTES.TICKETS)}
-            className={`flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 min-w-[44px] min-h-[44px] hover:bg-white/10 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-400 ${activeTab === '/tickets' ? 'text-blue-600' : 'text-gray-500'}`}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 min-w-[44px] min-h-[44px] hover:bg-black/5 active:scale-95 focus-visible:ring-2 focus-visible:ring-gray-400 ${activeTab === '/tickets' ? 'text-gray-950' : 'text-gray-600'}`}
           >
             <ClipboardList className={`w-6 h-6 mb-1 ${activeTab === '/tickets' ? 'stroke-[2.5]' : ''}`} />
             <span className="text-xs">{t('tab_ticket')}</span>
@@ -199,7 +172,7 @@ function MainLayoutContent() {
           <button
             type="button"
             onClick={() => navigate(ROUTES.PROFILE)}
-            className={`flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 min-w-[44px] min-h-[44px] hover:bg-white/10 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-400 ${activeTab === '/profile' ? 'text-blue-600' : 'text-gray-500'}`}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 min-w-[44px] min-h-[44px] hover:bg-black/5 active:scale-95 focus-visible:ring-2 focus-visible:ring-gray-400 ${activeTab === '/profile' ? 'text-gray-950' : 'text-gray-600'}`}
           >
             <User className={`w-6 h-6 mb-1 ${activeTab === '/profile' ? 'stroke-[2.5]' : ''}`} />
             <span className="text-xs">{t('tab_profile')}</span>
