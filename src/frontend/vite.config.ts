@@ -3,7 +3,11 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
 
+// 允许通过环境变量配置部署子路径，例如 VITE_BASE_PATH=/app/
+const basePath = process.env.VITE_BASE_PATH || '/';
+
 export default defineConfig({
+  base: basePath,
   plugins: [react()],
   resolve: {
     extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
@@ -39,7 +43,9 @@ export default defineConfig({
     ],
   },
   build: {
-    target: 'esnext',
+    // 与兼容矩阵（Chrome 80+ / Safari 14+ 等）对齐
+    // es2019 在这些浏览器中均有良好支持
+    target: 'es2019',
     outDir: 'build',
     // 生产构建：按职责拆分 chunk，避免单包过大
     rollupOptions: {

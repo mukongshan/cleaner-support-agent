@@ -47,8 +47,18 @@ export async function request<T = any>(
       url: fullUrl,
       status: response.status,
       statusText: response.statusText,
-      ok: response.ok
+      ok: response.ok,
     });
+
+    // HTTP 级别的 401（如网关或后端直接返回 401）
+    // 按「方案 A」：清除本地 Token 并跳转登录页（附带 redirect）
+    if (response.status === 401) {
+      console.warn('[API Request] HTTP 401 未授权，触发统一未登录处理', {
+        url: fullUrl,
+      });
+      handleUnauthorized();
+      throw new Error('请先登录');
+    }
 
     if (response.status === 404) {
       let msg = '资源不存在';

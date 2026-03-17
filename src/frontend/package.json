@@ -1,32 +1,39 @@
 {
-      "name": "售后问答机器人原型设计",
-      "version": "0.1.0",
-      "private": true,
-      "dependencies": {
-            "@radix-ui/react-dialog": "^1.1.6",
-            "@radix-ui/react-slot": "^1.1.2",
-            "@radix-ui/react-switch": "^1.1.3",
-            "@radix-ui/react-tooltip": "^1.1.8",
-            "class-variance-authority": "^0.7.1",
-            "clsx": "*",
-            "lucide-react": "^0.487.0",
-            "motion": "*",
-            "react": "^18.3.1",
-            "react-dom": "^18.3.1",
-            "react-router-dom": "^6.28.0",
-            "react-markdown": "^10.1.0",
-            "remark-gfm": "^4.0.1",
-            "sonner": "^2.0.3",
-            "tailwind-merge": "*",
-            "tailwindcss": "*"
-      },
-      "devDependencies": {
-            "@types/node": "^20.10.0",
-            "@vitejs/plugin-react-swc": "^3.10.2",
-            "vite": "6.3.5"
-      },
-      "scripts": {
-            "dev": "vite",
-            "build": "vite build"
-      }
+  "name": "售后问答机器人原型设计",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.6",
+    "@radix-ui/react-slot": "^1.1.2",
+    "@radix-ui/react-switch": "^1.1.3",
+    "@radix-ui/react-tooltip": "^1.1.8",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "*",
+    "lucide-react": "^0.487.0",
+    "motion": "*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "sonner": "^2.0.3",
+    "tailwind-merge": "*",
+    "tailwindcss": "*",
+    "web-vitals": "^3.5.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@vitejs/plugin-react-swc": "^3.10.2",
+    "vite": "6.3.5"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "browserslist": [
+    "Chrome >= 80",
+    "Safari >= 14",
+    "Firefox >= 80",
+    "Edge >= 80"
+  ]
 }

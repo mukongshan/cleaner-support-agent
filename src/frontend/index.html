@@ -1,24 +1,19 @@
 
-  <!DOCTYPE html>
-  <html lang="zh-CN">
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-      <title>售后问答机器人原型设计</title>
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>售后问答机器人原型设计</title>
 
-      <!-- 预连接 API 服务器，消除首次请求的 DNS + TCP + TLS 握手延迟 -->
-      <link rel="preconnect" href="http://localhost:8080" />
-      <link rel="dns-prefetch" href="http://localhost:8080" />
+    <!-- 首屏背景色，让页面在 JS 加载期间不是纯白 -->
+    <style>
+      html, body { background: #F5F7FA; margin: 0; padding: 0; }
+    </style>
+  </head>
 
-      <!-- 首屏背景色，让页面在 JS 加载期间不是纯白 -->
-      <style>
-        html, body { background: #F5F7FA; margin: 0; padding: 0; }
-      </style>
-    </head>
-
-    <body>
-      <div id="root"></div>
-      <script type="module" src="/src/main.tsx"></script>
-    </body>
-  </html>
-  
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
