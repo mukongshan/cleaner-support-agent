@@ -92,6 +92,12 @@ interface ChatPageProps {
   isLoggedIn?: boolean;
   onShowLogin?: () => void;
   onSaveInput?: (input: string) => void;
+  /** 桌面端侧边栏点击历史记录时传入，加载指定会话 */
+  targetConvId?: string;
+  /** 侧边栏点击历史记录时传入的会话标题 */
+  targetConvTitle?: string;
+  /** 桌面端侧边栏点击新建会话时传入的时间戳，每次点击值不同以触发 effect */
+  newChatTs?: number;
 }
 
 interface TicketFormData {
@@ -362,13 +368,17 @@ function AIMarkdownContent({ content }: { content: string }) {
   );
 }
 
-export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTicket, userRole, isLoggedIn = false, onShowLogin, onSaveInput }: ChatPageProps) {
+export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTicket, userRole, isLoggedIn = false, onShowLogin, onSaveInput, targetConvId, targetConvTitle, newChatTs }: ChatPageProps) {
   const { t, language } = useLanguage();
+  const isMobile = window.innerWidth < 768;
 
   // 更新页面标题
   useEffect(() => {
     document.title = `${t('tab_chat')} - ${t('app_name')}`;
   }, [language, t]);
+
+  // 当前对话标题（桌面端顶栏显示）
+  const [conversationTitle, setConversationTitle] = useState('');
 
   // 聊天会话管理
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
@@ -763,6 +773,25 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
       loadHistoryConversations();
     }
   }, [showHistoryDialog]);
+
+  // 桌面端侧边栏：响应 targetConvId 变化，加载对应会话
+  const loadedTargetConvIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (targetConvId && isLoggedIn && targetConvId !== loadedTargetConvIdRef.current) {
+      loadedTargetConvIdRef.current = targetConvId;
+      setConversationTitle(targetConvTitle || '');
+      loadConversationDetail(targetConvId);
+    }
+  }, [targetConvId, targetConvTitle, isLoggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 桌面端侧边栏：响应新建会话点击（时间戳每次不同，确保 effect 触发）
+  const processedNewChatTsRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (newChatTs && newChatTs !== processedNewChatTsRef.current) {
+      processedNewChatTsRef.current = newChatTs;
+      resetToNewChat();
+    }
+  }, [newChatTs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 阻止历史对话框打开时背景滚动
   useEffect(() => {
@@ -1944,6 +1973,8 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
     setShowTicketPrompt(false);
     setIsHistoryConversation(false);
     setHasCreatedNewChat(true);
+    setConversationTitle('');
+    loadedTargetConvIdRef.current = null;
   };
   /** 弹出删除提示：先 dismiss 上一条，立即弹新的，确保每次都有明显的入场动画 */
   const showDeleteToast = (type: 'success' | 'error') => {
@@ -2142,21 +2173,27 @@ export function ChatPage({ initialMessage, onInitialMessageConsumed, onCreateTic
           backgroundColor: 'rgba(255, 255, 255, 0.1)'
         }}
       >
-        <h2 className="font-semibold text-gray-900">{t('app_name')}</h2>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowHistoryDialog(true)}
-            className="p-2 hover:bg-white/20 rounded-lg transition-colors haptic-feedback"
-          >
-            <History className="w-5 h-5 text-gray-700" />
-          </button>
-          <button
-            onClick={handleNewChat}
-            className="p-2 hover:bg-white/20 rounded-lg transition-colors haptic-feedback"
-          >
-            <Plus className="w-5 h-5 text-gray-700" />
-          </button>
-        </div>
+        <h2 className="font-semibold text-gray-900 truncate">
+          {isMobile
+            ? t('app_name')
+            : (conversationTitle || t('new_chat'))}
+        </h2>
+        {isMobile && (
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowHistoryDialog(true)}
+              className="p-2 hover:bg-white/20 rounded-lg transition-colors haptic-feedback"
+            >
+              <History className="w-5 h-5 text-gray-700" />
+            </button>
+            <button
+              onClick={handleNewChat}
+              className="p-2 hover:bg-white/20 rounded-lg transition-colors haptic-feedback"
+            >
+              <Plus className="w-5 h-5 text-gray-700" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 问题解决提示横幅 - QQ群待办样式 */}

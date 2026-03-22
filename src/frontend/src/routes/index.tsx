@@ -15,6 +15,9 @@ import { NotFoundPage } from '../pages/NotFoundPage';
 import { TicketDetailRoute } from '../pages/TicketDetailRoute';
 import { getToken, getStoredUserRole, setStoredUserRole, setNavigateToLogin } from '../services/api';
 import type { UserRole } from '../types/app';
+import { DesktopSidebar } from '../components/DesktopSidebar';
+
+const MOBILE_BREAKPOINT = 768;
 
 /** 登录页包装：从 URL 读取 redirect，登录成功后跳转 */
 function LoginPageWrapper() {
@@ -62,7 +65,12 @@ export type LayoutContext = {
 
 function ChatPageWithContext() {
   const ctx = useOutletContext<LayoutContext>();
+  const location = useLocation();
   const [initialMessage, setInitialMessage] = useState('');
+  const navState = location.state as Record<string, unknown> | null;
+  const targetConvId = navState?.convId as string | undefined;
+  const targetConvTitle = navState?.convTitle as string | undefined;
+  const newChatTs = navState?.newChat as number | undefined;
   return (
     <ChatPage
       initialMessage={initialMessage}
@@ -72,6 +80,9 @@ function ChatPageWithContext() {
       isLoggedIn={ctx.isLoggedIn}
       onShowLogin={() => ctx.navigate(`${ROUTES.LOGIN}?redirect=${encodeURIComponent(ctx.location.pathname + ctx.location.search)}`)}
       onSaveInput={() => {}}
+      targetConvId={targetConvId}
+      targetConvTitle={targetConvTitle}
+      newChatTs={newChatTs}
     />
   );
 }
@@ -114,8 +125,17 @@ function MainLayoutContent() {
   const location = useLocation();
   const navigate = useNavigate();
   const activeTab: TabPath | null = pathnameToTab(location.pathname);
+  // 同步初始化，避免布局闪烁
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < MOBILE_BREAKPOINT);
+  useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+    const onChange = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
 
   const [userRole, setUserRole] = useState<UserRole>(() => getStoredUserRole() ?? 'enduser');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const isLoggedIn = !!getToken();
 
   const contextValue: LayoutContext = {
@@ -129,6 +149,24 @@ function MainLayoutContent() {
     isLoggedIn,
   };
 
+  // ── 桌面端布局（≥768px）──────────────────────────────────
+  if (!isMobile) {
+    const activeConvId = (location.state as Record<string, unknown> | null)?.convId as string | undefined;
+    return (
+      <div className="flex h-screen w-full bg-white overflow-hidden">
+        <DesktopSidebar
+          collapsed={sidebarCollapsed}
+          onToggle={() => setSidebarCollapsed((c) => !c)}
+          activeConvId={activeConvId}
+        />
+        <main className="flex-1 overflow-hidden bg-gray-50">
+          <Outlet context={contextValue} />
+        </main>
+      </div>
+    );
+  }
+
+  // ── 移动端布局（<768px，保持原样）────────────────────────
   return (
     <div className="global-layout-container h-screen flex flex-col mx-auto relative overflow-hidden md:border-x md:shadow-2xl bg-white/50">
       <div
